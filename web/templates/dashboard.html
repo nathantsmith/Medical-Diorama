@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Medical Diorama{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+
+    <!-- ================================================================= -->
+    <!-- PATIENT MONITOR PANEL                                              -->
+    <!-- ================================================================= -->
+    <section class="panel monitor-panel">
+        <h2>Patient Monitor</h2>
+
+        <!-- Live status indicator -->
+        <div class="status-row">
+            <span class="status-dot" id="monitor-status-dot"></span>
+            <span id="monitor-status-text">Connecting...</span>
+            <span class="fps-badge" id="monitor-fps">-- FPS</span>
+        </div>
+
+        <!-- Heart Rate Control -->
+        <div class="control-group">
+            <label for="hr-slider">Heart Rate (BPM)</label>
+            <div class="slider-row">
+                <input type="range" id="hr-slider" min="30" max="250" value="72"
+                       class="slider">
+                <span class="slider-value" id="hr-value">72</span>
+            </div>
+        </div>
+
+        <!-- SpO2 Control -->
+        <div class="control-group">
+            <label for="spo2-slider">Blood Oxygen (SpO2 %)</label>
+            <div class="slider-row">
+                <input type="range" id="spo2-slider" min="70" max="100" value="98"
+                       class="slider">
+                <span class="slider-value" id="spo2-value">98</span>
+            </div>
+        </div>
+
+        <!-- Apply vitals button -->
+        <button class="btn btn-primary" id="apply-vitals-btn">Apply Vitals</button>
+
+        <!-- Alarm Controls -->
+        <div class="control-group">
+            <label>Alarm Controls</label>
+            <div class="alarm-buttons">
+                <button class="btn btn-danger" data-alarm="hr_high">High HR Alarm</button>
+                <button class="btn btn-danger" data-alarm="hr_low">Low HR Alarm</button>
+                <button class="btn btn-danger" data-alarm="spo2_low">Low SpO2 Alarm</button>
+                <button class="btn btn-success" data-alarm="clear">Clear Alarm</button>
+            </div>
+        </div>
+
+        <!-- Current alarm display -->
+        <div class="alarm-status" id="alarm-status">
+            <span>Current Alarm: </span>
+            <span id="alarm-value">None</span>
+        </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- X-RAY VIEWER PANEL                                                 -->
+    <!-- ================================================================= -->
+    <section class="panel xray-panel">
+        <h2>X-Ray Viewer</h2>
+
+        <!-- Live status indicator -->
+        <div class="status-row">
+            <span class="status-dot" id="xray-status-dot"></span>
+            <span id="xray-status-text">Connecting...</span>
+        </div>
+
+        <!-- Slideshow Controls -->
+        <div class="control-group">
+            <label>Slideshow</label>
+            <div class="slideshow-controls">
+                <button class="btn btn-secondary" id="auto-play-btn">Auto-Play: --</button>
+                <div class="interval-row">
+                    <label for="interval-slider">Interval (sec):</label>
+                    <input type="range" id="interval-slider" min="2" max="120" value="8"
+                           class="slider slider-small">
+                    <span class="slider-value" id="interval-value">8</span>
+                    <button class="btn btn-small" id="apply-interval-btn">Set</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Upload -->
+        <div class="control-group">
+            <label>Upload X-Ray Image</label>
+            <div class="upload-area" id="upload-area">
+                <input type="file" id="file-input" accept="image/*" hidden>
+                <p>Click or drag an image here to upload</p>
+            </div>
+            <div class="upload-status" id="upload-status"></div>
+        </div>
+
+        <!-- Image Gallery -->
+        <div class="control-group">
+            <label>Images in Rotation (<span id="image-count">0</span>)</label>
+            <div class="image-gallery" id="image-gallery">
+                <p class="no-images-msg">No images uploaded yet.</p>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Socket.IO client library (served by Flask-SocketIO) -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+<!-- Dashboard JavaScript -->
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

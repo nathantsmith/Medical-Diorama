@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Medical Diorama{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <h1>Medical Diorama</h1>
+        <p class="login-subtitle">Control Panel Login</p>
+
+        <form method="POST" action="{{ url_for('auth.login') }}">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username"
+                       required autofocus autocomplete="username"
+                       placeholder="Enter username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password"
+                       required autocomplete="current-password"
+                       placeholder="Enter password">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">Log In</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
