@@ -30,6 +30,7 @@ Usage:
 import time
 import logging
 import numpy as np
+from PIL import Image
 
 from config import (
     SPI_PORT, SPI_CS, SPI_DC_PIN, SPI_RST_PIN, SPI_BL_PIN,
@@ -277,17 +278,18 @@ class SPIDisplay:
         """
         Push a PIL Image to the display.
 
-        Accepts a 240x320 RGB PIL Image. Converts it to RGB565 format
-        using numpy for speed, then sends the pixel data over SPI.
-
-        The image is rotated 180 degrees and the MADCTL register is set
-        to 0x70 for correct orientation, matching the Seengreat reference.
+        Accepts a 240x320 RGB PIL Image (portrait). The image is automatically
+        transposed and rotated to match the Seengreat display's native landscape
+        orientation (320x240), with MADCTL set to 0x70.
 
         Args:
             image: A PIL.Image.Image in RGB mode, sized 240x320.
         """
-        # Rotate image 180 degrees to match the Seengreat display orientation
-        img = image.rotate(180)
+        # The Seengreat display expects 320x240 landscape data with MADCTL=0x70.
+        # Transpose the 240x320 portrait image: rotate 90° CCW then flip,
+        # matching the Seengreat reference which does img.rotate(180) on a
+        # (320, 240) source image.
+        img = image.transpose(Image.TRANSPOSE).rotate(180)
 
         # Convert PIL image to numpy array for fast RGB565 conversion
         # Shape: (height, width, 3) with values 0-255 for R, G, B
