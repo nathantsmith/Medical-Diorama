@@ -34,9 +34,26 @@ def run(state, shutdown_event, mock_hardware=False):
         shutdown_event: A multiprocessing.Event that signals shutdown.
         mock_hardware: If True, use MockSPIDisplay instead of real hardware.
     """
+    # Set up logging for this child process (spawn mode doesn't inherit it)
+    import sys
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s [%(processName)s] %(name)s %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stderr,
+    )
+
+    logger.info("Patient monitor process starting...")
+
     # Import display and renderer here (inside the process) because
     # the SPI hardware should only be initialized in this process.
-    from monitor.renderer import MonitorRenderer
+    try:
+        from monitor.renderer import MonitorRenderer
+        logger.info("MonitorRenderer imported OK")
+    except Exception as e:
+        logger.error("Failed to import MonitorRenderer: %s", e, exc_info=True)
+        state["monitor_running"] = False
+        return
 
     if mock_hardware:
         from monitor.spi_display import MockSPIDisplay as DisplayClass
@@ -46,11 +63,22 @@ def run(state, shutdown_event, mock_hardware=False):
     # Initialize display hardware and renderer
     try:
         display = DisplayClass()
+        logger.info("Display initialized OK")
         renderer = MonitorRenderer()
+        logger.info("Renderer initialized OK")
     except Exception as e:
-        logger.error("Failed to initialize patient monitor: %s", e)
+        logger.error("Failed to initialize patient monitor: %s", e, exc_info=True)
         state["monitor_running"] = False
         return
+
+    # Show a brief startup test frame (bright green) to confirm the display works
+    try:
+        from PIL import Image
+        test_img = Image.new("RGB", (240, 320), (0, 255, 0))
+        display.show(test_img)
+        logger.info("Startup test frame sent to display (green screen)")
+    except Exception as e:
+        logger.error("Failed to send test frame: %s", e, exc_info=True)
 
     # Mark the monitor as running in shared state
     state["monitor_running"] = True
