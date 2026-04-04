@@ -54,21 +54,21 @@ class SPIDisplay:
         import gpiod
 
         # --- GPIO Setup ---
-        # On Pi 5, the GPIO chip is "gpiochip4" (not gpiochip0 like Pi 4)
-        # Try gpiochip4 first (Pi 5), fall back to gpiochip0 (Pi 4 and earlier)
-        chip_name = None
-        for name in ["gpiochip4", "gpiochip0"]:
+        # On Pi 5, the GPIO chip is "/dev/gpiochip4" (not gpiochip0 like Pi 4)
+        # gpiod v2 requires the full /dev/ path
+        chip_path = None
+        for path in ["/dev/gpiochip4", "/dev/gpiochip0"]:
             try:
-                self._chip = gpiod.Chip(name)
-                chip_name = name
+                self._chip = gpiod.Chip(path)
+                chip_path = path
                 break
             except (FileNotFoundError, OSError, PermissionError):
                 continue
 
-        if chip_name is None:
-            raise RuntimeError("Could not open any GPIO chip (tried gpiochip4, gpiochip0)")
+        if chip_path is None:
+            raise RuntimeError("Could not open any GPIO chip (tried /dev/gpiochip4, /dev/gpiochip0)")
 
-        logger.info("Using GPIO chip: %s", chip_name)
+        logger.info("Using GPIO chip: %s", chip_path)
 
         # Request the DC, RST, and BL pins as outputs
         # gpiod v2 API (used on Pi 5 with bookworm)
