@@ -15,11 +15,11 @@ import os
 # connection for Raspberry Pi.
 
 SPI_PORT = 0          # SPI bus number (0 = /dev/spidev0.x)
-SPI_CS = 0            # SPI chip-select (0 = CE0, pin 24)
-SPI_DC_PIN = 25       # Data/Command pin (active high = data)
-SPI_RST_PIN = 27      # Reset pin (active low to reset display)
-SPI_BL_PIN = 24       # Backlight control pin
-SPI_SPEED_HZ = 40_000_000  # SPI clock speed in Hz (40 MHz is safe for ST7789V)
+SPI_CS = 0            # SPI chip-select (0 = CE0)
+SPI_DC_PIN = 25       # Data/Command pin (BCM 25 = WiringPi 6)
+SPI_RST_PIN = 22      # Reset pin (BCM 22 = WiringPi 3)
+SPI_BL_PIN = 24       # Backlight control pin (BCM 24 = WiringPi 5)
+SPI_SPEED_HZ = 40_000_000  # SPI clock speed in Hz (40 MHz, Seengreat default is 4MHz)
 
 # =============================================================================
 # Patient Monitor Display Settings
