@@ -1,0 +1,542 @@
+/*
+ * style.css - Medical Diorama web portal styles.
+ *
+ * Dark theme with a medical monitor aesthetic.
+ * Responsive layout for both desktop and mobile access.
+ */
+
+/* =============================================================================
+   Reset and Base Styles
+   ============================================================================= */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #0a0a0a;
+    color: #e0e0e0;
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* =============================================================================
+   Navigation Bar
+   ============================================================================= */
+
+.navbar {
+    background-color: #1a1a2e;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #16213e;
+}
+
+.nav-brand {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #00ff88;
+}
+
+.nav-links a {
+    color: #8888aa;
+    text-decoration: none;
+    margin-left: 1.5rem;
+    transition: color 0.2s;
+}
+
+.nav-links a:hover {
+    color: #00ff88;
+}
+
+/* =============================================================================
+   Flash Messages
+   ============================================================================= */
+
+.flash-messages {
+    padding: 0.5rem 1.5rem;
+}
+
+.flash {
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.flash-error {
+    background-color: #3a1a1a;
+    color: #ff6666;
+    border: 1px solid #ff4444;
+}
+
+.flash-info {
+    background-color: #1a2a3a;
+    color: #66aaff;
+    border: 1px solid #4488ff;
+}
+
+/* =============================================================================
+   Content Area
+   ============================================================================= */
+
+.content {
+    padding: 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* =============================================================================
+   Login Page
+   ============================================================================= */
+
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 70vh;
+}
+
+.login-card {
+    background-color: #1a1a2e;
+    padding: 2.5rem;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 400px;
+    border: 1px solid #16213e;
+}
+
+.login-card h1 {
+    color: #00ff88;
+    text-align: center;
+    margin-bottom: 0.25rem;
+}
+
+.login-subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+/* =============================================================================
+   Forms
+   ============================================================================= */
+
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: #aaa;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"] {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background-color: #0f0f23;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #00ff88;
+}
+
+/* =============================================================================
+   Buttons
+   ============================================================================= */
+
+.btn {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-primary {
+    background-color: #00cc6a;
+    color: #000;
+}
+
+.btn-primary:hover {
+    background-color: #00ff88;
+}
+
+.btn-secondary {
+    background-color: #333;
+    color: #ccc;
+}
+
+.btn-secondary:hover {
+    background-color: #444;
+}
+
+.btn-danger {
+    background-color: #cc3333;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background-color: #ee4444;
+}
+
+.btn-success {
+    background-color: #2a7a2a;
+    color: #fff;
+}
+
+.btn-success:hover {
+    background-color: #3a9a3a;
+}
+
+.btn-small {
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+    background-color: #444;
+    color: #ccc;
+}
+
+.btn-small:hover {
+    background-color: #555;
+}
+
+.btn-full {
+    width: 100%;
+}
+
+/* =============================================================================
+   Dashboard Layout
+   ============================================================================= */
+
+.dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+/* Stack panels vertically on small screens */
+@media (max-width: 768px) {
+    .dashboard {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =============================================================================
+   Panels
+   ============================================================================= */
+
+.panel {
+    background-color: #1a1a2e;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid #16213e;
+}
+
+.panel h2 {
+    color: #00ff88;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #16213e;
+}
+
+/* =============================================================================
+   Status Indicators
+   ============================================================================= */
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #555;
+    /* Default: disconnected/unknown */
+}
+
+.status-dot.active {
+    background-color: #00ff88;
+    box-shadow: 0 0 6px #00ff88;
+}
+
+.status-dot.inactive {
+    background-color: #ff4444;
+}
+
+.fps-badge {
+    margin-left: auto;
+    background-color: #0f0f23;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: #888;
+}
+
+/* =============================================================================
+   Control Groups
+   ============================================================================= */
+
+.control-group {
+    margin-bottom: 1.25rem;
+}
+
+.control-group > label {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: #aaa;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* =============================================================================
+   Sliders
+   ============================================================================= */
+
+.slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: #333;
+    border-radius: 3px;
+    outline: none;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #00cc6a;
+    cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #00cc6a;
+    cursor: pointer;
+    border: none;
+}
+
+.slider-value {
+    min-width: 3rem;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #00ff88;
+}
+
+.slider-small {
+    width: 100px;
+}
+
+/* =============================================================================
+   Alarm Controls
+   ============================================================================= */
+
+.alarm-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.alarm-status {
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background-color: #0f0f23;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.alarm-status.alarm-active {
+    background-color: #3a1a1a;
+    border: 1px solid #ff4444;
+    animation: alarm-pulse 1s infinite;
+}
+
+@keyframes alarm-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+#alarm-value {
+    font-weight: bold;
+    color: #00ff88;
+}
+
+#alarm-value.alarm-on {
+    color: #ff4444;
+}
+
+/* =============================================================================
+   Slideshow Controls
+   ============================================================================= */
+
+.slideshow-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.interval-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.interval-row label {
+    white-space: nowrap;
+    text-transform: none !important;
+    color: #ccc !important;
+}
+
+/* =============================================================================
+   Upload Area
+   ============================================================================= */
+
+.upload-area {
+    border: 2px dashed #333;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+    color: #666;
+}
+
+.upload-area:hover,
+.upload-area.drag-over {
+    border-color: #00cc6a;
+    background-color: #0a1a0a;
+    color: #aaa;
+}
+
+.upload-status {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #888;
+}
+
+.upload-status.success {
+    color: #00ff88;
+}
+
+.upload-status.error {
+    color: #ff4444;
+}
+
+/* =============================================================================
+   Image Gallery
+   ============================================================================= */
+
+.image-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.75rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.image-card {
+    position: relative;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 2px solid #333;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.image-card:hover {
+    border-color: #00cc6a;
+}
+
+.image-card.current {
+    border-color: #00ff88;
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+}
+
+.image-card img {
+    width: 100%;
+    height: 80px;
+    object-fit: cover;
+    display: block;
+}
+
+.image-card .image-name {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.65rem;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background-color: #0f0f23;
+}
+
+.image-card .delete-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(200, 0, 0, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.image-card:hover .delete-btn {
+    display: flex;
+}
+
+.no-images-msg {
+    color: #555;
+    font-style: italic;
+    grid-column: 1 / -1;
+}

@@ -1,0 +1,20 @@
+# Medical Diorama - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# --- SPI Display (Patient Monitor) ---
+st7789            # ST7789V display driver for Raspberry Pi
+spidev            # SPI interface for Linux
+gpiod             # GPIO control (Pi 5 compatible, replaces RPi.GPIO)
+
+# --- Image Rendering ---
+Pillow            # Image creation and manipulation for monitor display
+numpy             # Efficient waveform math (sine waves, interpolation)
+
+# --- HDMI Display (X-Ray Viewer) ---
+pygame>=2.5       # Fullscreen rendering, touch input, image display
+
+# --- Web Portal ---
+Flask>=3.0        # Lightweight web framework
+Flask-Login       # Session-based authentication
+Flask-SocketIO    # Real-time WebSocket communication
+python-dotenv     # Load secrets from .env file
