@@ -38,20 +38,22 @@ class SPIDisplay:
 
             # Create the display instance with our pin configuration.
             # The st7789 library handles all the low-level SPI setup.
+            # Pimoroni st7789 v1.0.1 constructor signature:
+            #   ST7789(port, cs, dc, backlight, rst, width, height,
+            #          rotation, invert, spi_speed_hz, offset_left, offset_top)
             self._display = st7789_lib.ST7789(
                 port=SPI_PORT,
                 cs=SPI_CS,
                 dc=SPI_DC_PIN,
-                rst=SPI_RST_PIN,
                 backlight=SPI_BL_PIN,
+                rst=SPI_RST_PIN,
                 width=MONITOR_WIDTH,
                 height=MONITOR_HEIGHT,
                 rotation=MONITOR_ROTATION,
+                invert=True,             # ST7789V typically needs invert=True
                 spi_speed_hz=SPI_SPEED_HZ,
             )
-
-            # Turn on the backlight so we can see the display
-            self._display.begin()
+            # Note: No .begin() call needed — the constructor initializes the display
             logger.info(
                 "ST7789V display initialized: %dx%d @ %d Hz SPI",
                 MONITOR_WIDTH, MONITOR_HEIGHT, SPI_SPEED_HZ
