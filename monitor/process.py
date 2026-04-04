@@ -101,10 +101,14 @@ def run(state, shutdown_event, mock_hardware=False):
             current_alarm = state.get("monitor_alarm", None)
 
             # --- Step 2: Auto-check alarm thresholds ---
-            # If no alarm is manually set, check if vitals have crossed thresholds
-            new_alarm = _check_alarm_thresholds(hr, spo2, current_alarm)
-            if new_alarm != current_alarm:
-                state["monitor_alarm"] = new_alarm
+            # Only auto-trigger alarms if no alarm is already set (e.g. from web UI).
+            # This ensures manually-triggered alarms from the dashboard are not
+            # overridden by the threshold check.
+            if current_alarm is None:
+                auto_alarm = _check_alarm_thresholds(hr, spo2)
+                if auto_alarm is not None:
+                    state["monitor_alarm"] = auto_alarm
+                    current_alarm = auto_alarm
 
             # --- Step 3: Build a state snapshot for the renderer ---
             # We pass a plain dict (not the Manager proxy) to avoid repeated
@@ -112,7 +116,7 @@ def run(state, shutdown_event, mock_hardware=False):
             state_snapshot = {
                 "monitor_hr": hr,
                 "monitor_spo2": spo2,
-                "monitor_alarm": new_alarm,
+                "monitor_alarm": current_alarm,
             }
 
             # --- Step 4: Render the frame ---
@@ -150,22 +154,20 @@ def run(state, shutdown_event, mock_hardware=False):
         logger.info("Patient monitor process stopped")
 
 
-def _check_alarm_thresholds(hr, spo2, current_alarm):
+def _check_alarm_thresholds(hr, spo2):
     """
     Check if vital signs have crossed alarm thresholds.
 
-    Auto-triggers alarms when vitals go out of range. If vitals return
-    to normal range, the alarm is automatically cleared.
+    Returns an alarm type string if vitals are out of range,
+    or None if everything is normal.
 
     Args:
         hr: Current heart rate in BPM.
         spo2: Current SpO2 percentage.
-        current_alarm: Currently active alarm string or None.
 
     Returns:
-        The alarm string that should be active, or None if all vitals are normal.
+        The alarm string to trigger, or None if all vitals are normal.
     """
-    # Check each threshold in priority order (most critical first)
     if hr >= ALARM_THRESHOLDS["hr_high"]:
         return "hr_high"
     elif hr <= ALARM_THRESHOLDS["hr_low"]:
@@ -173,5 +175,4 @@ def _check_alarm_thresholds(hr, spo2, current_alarm):
     elif spo2 <= ALARM_THRESHOLDS["spo2_low"]:
         return "spo2_low"
     else:
-        # All vitals are within normal range — clear any auto-triggered alarm
         return None
