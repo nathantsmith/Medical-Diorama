@@ -296,7 +296,8 @@ class SPIDisplay:
         # Convert RGB888 to RGB565 (16-bit color):
         #   High byte: RRRRRGGG (top 5 bits of R + top 3 bits of G)
         #   Low byte:  GGGBBBBB (bottom 3 bits of G + top 5 bits of B)
-        pixel = np.zeros((self._width, self._height, 2), dtype=np.uint8)
+        # rgb shape is (height, width, 3) — numpy uses row-major (height first)
+        pixel = np.zeros((rgb.shape[0], rgb.shape[1], 2), dtype=np.uint8)
         pixel[..., 0] = np.add(
             np.bitwise_and(rgb[..., 0], 0xF8),
             np.right_shift(rgb[..., 1], 5)
