@@ -289,7 +289,7 @@ class SPIDisplay:
         # Transpose the 240x320 portrait image: rotate 90° CCW then flip,
         # matching the Seengreat reference which does img.rotate(180) on a
         # (320, 240) source image.
-        img = image.transpose(Image.TRANSVERSE)
+        img = image.transpose(Image.TRANSPOSE).rotate(180).transpose(Image.FLIP_LEFT_RIGHT)
 
         # Convert PIL image to numpy array for fast RGB565 conversion
         # Shape: (height, width, 3) with values 0-255 for R, G, B
