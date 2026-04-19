@@ -1,137 +1,98 @@
 """
 xray/slideshow.py - X-ray slideshow logic and image management.
 
-Manages the image rotation for the X-ray viewer display:
-  - Auto-advance: cycles through images on a timer
-  - Manual navigation: next/previous via swipe gestures
-  - State sync: reads and writes the shared state dict
-
-The image list and current index live in shared state so the web portal
-can also control what's being displayed and know what's currently shown.
+Manages the image rotation for one X-ray viewer display. Each display has
+its own Slideshow instance, bound to a display_id whose state keys take the
+form "<display_id>_images", "<display_id>_current_index", etc.
 """
 
 import os
 import time
 import logging
 
-from config import XRAY_DIR
+import config
 
 logger = logging.getLogger(__name__)
 
 
 class Slideshow:
     """
-    Manages the X-ray image slideshow state and auto-advance timing.
-
-    Works with the shared state dict to coordinate between the display
-    process (which shows images) and the web portal (which uploads/manages them).
+    Manages the X-ray image slideshow state and auto-advance timing
+    for one display. Operates on the shared state dict under the
+    "<display_id>_*" key prefix.
     """
 
-    def __init__(self, state):
+    def __init__(self, state, display_id):
         """
-        Initialize the slideshow manager.
-
         Args:
             state: The shared multiprocessing Manager dict.
+            display_id: Display identifier matching config.XRAY_DISPLAYS.
         """
         self._state = state
-        # Track when we last auto-advanced (for the timer)
+        self._id = display_id
+        self._dir = config.xray_dir_for(display_id)
         self._last_advance_time = time.time()
+
+    # --- Key helpers --------------------------------------------------------
+
+    def _k(self, suffix):
+        return f"{self._id}_{suffix}"
+
+    # --- Navigation ---------------------------------------------------------
 
     def next_image(self):
-        """
-        Advance to the next image in the rotation.
-
-        Wraps around to the first image after the last one.
-        Resets the auto-advance timer so the new image stays
-        on screen for the full interval.
-        """
-        images = list(self._state.get("xray_images", []))
+        """Advance to the next image, wrapping around."""
+        images = list(self._state.get(self._k("images"), []))
         if not images:
             return
-
-        # Increment index, wrapping around to 0
-        current = self._state.get("xray_current_index", 0)
+        current = self._state.get(self._k("current_index"), 0)
         new_index = (current + 1) % len(images)
-        self._state["xray_current_index"] = new_index
-
-        # Reset the auto-advance timer
+        self._state[self._k("current_index")] = new_index
         self._last_advance_time = time.time()
-        logger.debug("Advanced to image %d/%d", new_index + 1, len(images))
+        logger.debug("[%s] advanced to image %d/%d", self._id, new_index + 1, len(images))
 
     def prev_image(self):
-        """
-        Go back to the previous image in the rotation.
-
-        Wraps around to the last image if currently on the first one.
-        Resets the auto-advance timer.
-        """
-        images = list(self._state.get("xray_images", []))
+        """Go back one image, wrapping around."""
+        images = list(self._state.get(self._k("images"), []))
         if not images:
             return
-
-        current = self._state.get("xray_current_index", 0)
+        current = self._state.get(self._k("current_index"), 0)
         new_index = (current - 1) % len(images)
-        self._state["xray_current_index"] = new_index
-
-        # Reset the auto-advance timer
+        self._state[self._k("current_index")] = new_index
         self._last_advance_time = time.time()
-        logger.debug("Went back to image %d/%d", new_index + 1, len(images))
+        logger.debug("[%s] back to image %d/%d", self._id, new_index + 1, len(images))
 
     def toggle_auto_play(self):
         """Toggle the auto-advance slideshow on or off."""
-        current = self._state.get("xray_auto_play", True)
-        self._state["xray_auto_play"] = not current
-        logger.info("Auto-play %s", "enabled" if not current else "disabled")
-        # Reset timer when re-enabling so it doesn't immediately advance
+        current = self._state.get(self._k("auto_play"), True)
+        self._state[self._k("auto_play")] = not current
+        logger.info("[%s] auto-play %s", self._id, "enabled" if not current else "disabled")
         self._last_advance_time = time.time()
 
-    def get_current_path(self):
-        """
-        Get the full file path to the currently displayed image.
+    # --- Current image ------------------------------------------------------
 
-        Returns:
-            Full path string to the current image, or None if no images
-            are available.
-        """
-        images = list(self._state.get("xray_images", []))
+    def get_current_path(self):
+        """Full path to the current image, or None if no images exist."""
+        images = list(self._state.get(self._k("images"), []))
         if not images:
             return None
-
-        index = self._state.get("xray_current_index", 0)
-
-        # Clamp index to valid range (in case images were deleted)
+        index = self._state.get(self._k("current_index"), 0)
         if index >= len(images):
             index = 0
-            self._state["xray_current_index"] = 0
+            self._state[self._k("current_index")] = 0
+        return os.path.join(self._dir, images[index])
 
-        return os.path.join(XRAY_DIR, images[index])
+    # --- Auto-advance -------------------------------------------------------
 
     def check_auto_advance(self):
-        """
-        Check if it's time to auto-advance to the next image.
-
-        Only advances if auto-play is enabled and enough time has
-        passed since the last advance (manual or automatic).
-
-        Returns:
-            True if the slideshow advanced, False otherwise.
-        """
-        # Don't auto-advance if disabled
-        if not self._state.get("xray_auto_play", True):
+        """Advance if auto-play is on and the interval has elapsed."""
+        if not self._state.get(self._k("auto_play"), True):
             return False
-
-        # Don't advance if there are no images
-        images = list(self._state.get("xray_images", []))
+        images = list(self._state.get(self._k("images"), []))
         if len(images) <= 1:
             return False
-
-        # Check if enough time has passed
-        interval = self._state.get("xray_interval", 8)
-        elapsed = time.time() - self._last_advance_time
-
-        if elapsed >= interval:
+        interval = self._state.get(self._k("interval"), config.XRAY_DEFAULT_INTERVAL)
+        if time.time() - self._last_advance_time >= interval:
             self.next_image()
             return True
-
         return False

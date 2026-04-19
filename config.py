@@ -25,8 +25,8 @@ SPI_SPEED_HZ = 40_000_000  # SPI clock speed in Hz (40 MHz, Seengreat default is
 # Patient Monitor Display Settings
 # =============================================================================
 
-MONITOR_WIDTH = 240       # Display width in pixels
-MONITOR_HEIGHT = 320      # Display height in pixels
+MONITOR_WIDTH = 320       # Display width in pixels (landscape)
+MONITOR_HEIGHT = 240      # Display height in pixels (landscape)
 MONITOR_TARGET_FPS = 30   # Target frames per second for animation
 MONITOR_ROTATION = 0      # Display rotation (0=portrait, 90/180/270)
 
@@ -34,16 +34,14 @@ MONITOR_ROTATION = 0      # Display rotation (0=portrait, 90/180/270)
 # X-Ray Viewer Display Settings
 # =============================================================================
 
-# The Pi 5 has two HDMI outputs. The 4" touchscreen plugs into one of them.
-# Under X11, we position the pygame window on the correct display.
-# Under KMS/DRM (headless), we target a specific DRM device.
-HDMI_DISPLAY_INDEX = 1    # Which HDMI output (0 = primary, 1 = secondary)
-
-# Environment variables set before pygame.init() to target the right display.
-# Adjust these based on your Pi's display configuration.
-HDMI_DISPLAY_ENV = {
-    "SDL_VIDEO_WINDOW_POS": "0,0",  # Position window at top-left of target display
-}
+# The Pi 5 has two HDMI outputs. We run one slideshow process per output, each
+# with its own image directory and independent playback state. The `hdmi_index`
+# matches pygame.display.set_mode(display=N) — 0 = HDMI0 (near USB-C power),
+# 1 = HDMI1.
+XRAY_DISPLAYS = [
+    {"id": "xray1", "hdmi_index": 0, "label": "X-Ray Display 1"},
+    {"id": "xray2", "hdmi_index": 1, "label": "X-Ray Display 2"},
+]
 
 XRAY_SLIDESHOW_FPS = 15       # FPS for the X-ray viewer (low is fine for stills)
 XRAY_DEFAULT_INTERVAL = 8     # Default seconds between auto-advance
@@ -63,8 +61,14 @@ WEB_PORT = 5000           # HTTP port for the web portal
 # Base directory of the project (where main.py lives)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Directory where uploaded X-ray images are stored
-XRAY_DIR = os.path.join(BASE_DIR, "data", "xrays")
+# Base directory for all X-ray images. Each display has its own subdirectory
+# (e.g. data/xrays/xray1/, data/xrays/xray2/).
+XRAY_BASE_DIR = os.path.join(BASE_DIR, "data", "xrays")
+
+
+def xray_dir_for(display_id):
+    """Return the image directory for a specific xray display."""
+    return os.path.join(XRAY_BASE_DIR, display_id)
 
 # Allowed image file extensions for X-ray uploads
 ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"}

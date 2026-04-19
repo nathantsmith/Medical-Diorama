@@ -18,7 +18,7 @@ from flask import Flask
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
 
-from config import WEB_HOST, WEB_PORT, BASE_DIR
+from config import WEB_HOST, WEB_PORT, BASE_DIR, XRAY_DISPLAYS
 
 logger = logging.getLogger(__name__)
 
@@ -106,19 +106,23 @@ def _get_state_snapshot(state):
     Returns:
         A plain dict with all state values.
     """
-    return {
+    snapshot = {
         "monitor_hr": state.get("monitor_hr", 72),
         "monitor_spo2": state.get("monitor_spo2", 98),
         "monitor_alarm": state.get("monitor_alarm", None),
         "monitor_fps": state.get("monitor_fps", 0),
         "monitor_running": state.get("monitor_running", False),
-        "xray_images": list(state.get("xray_images", [])),
-        "xray_current_index": state.get("xray_current_index", 0),
-        "xray_auto_play": state.get("xray_auto_play", True),
-        "xray_interval": state.get("xray_interval", 8),
-        "xray_running": state.get("xray_running", False),
-        "xray_status": state.get("xray_status", "no_images"),
+        "xray_displays": [d["id"] for d in XRAY_DISPLAYS],
     }
+    for display in XRAY_DISPLAYS:
+        display_id = display["id"]
+        snapshot[f"{display_id}_images"] = list(state.get(f"{display_id}_images", []))
+        snapshot[f"{display_id}_current_index"] = state.get(f"{display_id}_current_index", 0)
+        snapshot[f"{display_id}_auto_play"] = state.get(f"{display_id}_auto_play", True)
+        snapshot[f"{display_id}_interval"] = state.get(f"{display_id}_interval", 8)
+        snapshot[f"{display_id}_running"] = state.get(f"{display_id}_running", False)
+        snapshot[f"{display_id}_status"] = state.get(f"{display_id}_status", "no_images")
+    return snapshot
 
 
 def _background_status_emitter(state):

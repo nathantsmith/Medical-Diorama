@@ -29,8 +29,8 @@ import time
 # Add the project root to the Python path so all imports work
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import XRAY_DIR
-from shared.state import create_state, scan_xray_images
+from config import XRAY_DISPLAYS, XRAY_BASE_DIR
+from shared.state import create_state, scan_all_xray_images
 
 
 def parse_args():
@@ -110,12 +110,16 @@ def main():
     state = create_state(manager)
 
     # =========================================================================
-    # Step 2: Scan for existing X-ray images
+    # Step 2: Scan for existing X-ray images (one directory per display)
     # =========================================================================
-    os.makedirs(XRAY_DIR, exist_ok=True)
-    scan_xray_images(state)
-    image_count = len(list(state.get("xray_images", [])))
-    logger.info("Found %d X-ray image(s) in %s", image_count, XRAY_DIR)
+    os.makedirs(XRAY_BASE_DIR, exist_ok=True)
+    for display in XRAY_DISPLAYS:
+        os.makedirs(os.path.join(XRAY_BASE_DIR, display["id"]), exist_ok=True)
+    scan_all_xray_images(state)
+    for display in XRAY_DISPLAYS:
+        display_id = display["id"]
+        count = len(list(state.get(f"{display_id}_images", [])))
+        logger.info("Display %s: %d image(s)", display_id, count)
 
     # =========================================================================
     # Step 3: Create the shutdown event
@@ -142,18 +146,22 @@ def main():
     else:
         logger.info("Patient monitor process SKIPPED (--no-monitor)")
 
-    # --- X-Ray Viewer Process ---
+    # --- X-Ray Viewer Processes (one per display) ---
     if not args.no_xray:
         from xray.process import run as xray_run
-        xray_proc = multiprocessing.Process(
-            target=xray_run,
-            args=(state, shutdown_event, args.mock_hardware),
-            name="XRay",
-            daemon=True,
-        )
-        processes.append(("XRay", xray_proc))
+        for display in XRAY_DISPLAYS:
+            display_id = display["id"]
+            hdmi_index = display["hdmi_index"]
+            proc_name = f"XRay-{display_id}"
+            xray_proc = multiprocessing.Process(
+                target=xray_run,
+                args=(state, shutdown_event, display_id, hdmi_index, args.mock_hardware),
+                name=proc_name,
+                daemon=True,
+            )
+            processes.append((proc_name, xray_proc))
     else:
-        logger.info("X-ray viewer process SKIPPED (--no-xray)")
+        logger.info("X-ray viewer processes SKIPPED (--no-xray)")
 
     # --- Web Portal Process ---
     from web.app import run_server as web_run
