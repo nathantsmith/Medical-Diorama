@@ -1,48 +1,72 @@
 /**
  * dashboard.js - Client-side logic for the Medical Diorama web portal.
- *
- * Handles:
- *   - SocketIO connection for live status updates
- *   - Patient monitor controls (HR, SpO2 sliders, alarm buttons)
- *   - X-ray image upload (click and drag-and-drop)
- *   - X-ray gallery management (thumbnails, delete, select)
- *   - Slideshow controls (auto-play toggle, interval)
  */
 
-// =============================================================================
-// SocketIO Connection
-// =============================================================================
-
-// Connect to the Flask-SocketIO server
 const socket = io();
+const COLLAPSIBLE_STORAGE_PREFIX = "medical-diorama.collapsible.";
 
-// When connected, request an immediate status update
 socket.on("connect", function () {
     console.log("SocketIO connected");
     socket.emit("request_status");
 });
 
-// Handle live status updates from the server (sent every ~1 second)
 socket.on("status_update", function (data) {
     updateMonitorStatus(data);
-    updateXrayStatus(data);
+    updateRansomwarePanel(data);
+    updateAllXrayPanels(data);
 });
 
 socket.on("disconnect", function () {
     console.log("SocketIO disconnected");
     document.getElementById("monitor-status-text").textContent = "Disconnected";
-    document.getElementById("xray-status-text").textContent = "Disconnected";
+    document.getElementById("ransomware-status-text").textContent = "Disconnected";
+    document.querySelectorAll(".xray-panel [data-role='status-text']").forEach(function (el) {
+        el.textContent = "Disconnected";
+    });
 });
 
+function q(scope, role) {
+    return scope.querySelector(`[data-role='${role}']`);
+}
+
+function setCollapsibleState(section, expanded) {
+    const toggle = q(section, "collapsible-toggle");
+    const content = q(section, "collapsible-content");
+    const icon = toggle.querySelector(".collapsible-icon");
+
+    section.classList.toggle("is-collapsed", !expanded);
+    toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    content.hidden = !expanded;
+    icon.textContent = expanded ? "−" : "+";
+}
+
+document.querySelectorAll("[data-role='collapsible-section']").forEach(function (section) {
+    const toggle = q(section, "collapsible-toggle");
+    const storageKey = COLLAPSIBLE_STORAGE_PREFIX + (section.dataset.storageKey || "default");
+
+    toggle.addEventListener("click", function () {
+        const expanded = toggle.getAttribute("aria-expanded") === "true";
+        const nextExpanded = !expanded;
+        setCollapsibleState(section, nextExpanded);
+        localStorage.setItem(storageKey, nextExpanded ? "expanded" : "collapsed");
+    });
+
+    const savedState = localStorage.getItem(storageKey);
+    setCollapsibleState(section, savedState === "expanded");
+});
+
+function labelForRansomwareTarget(target) {
+    if (target === "monitor") return "Patient Monitor";
+    if (target === "xray1") return "X-Ray Display 1";
+    if (target === "xray2") return "X-Ray Display 2";
+    return target;
+}
+
 // =============================================================================
-// Patient Monitor - Status Updates
+// Patient Monitor
 // =============================================================================
 
-/**
- * Update the patient monitor section of the dashboard with live data.
- */
 function updateMonitorStatus(data) {
-    // Update status indicator
     const dot = document.getElementById("monitor-status-dot");
     const text = document.getElementById("monitor-status-text");
     if (data.monitor_running) {
@@ -52,19 +76,12 @@ function updateMonitorStatus(data) {
         dot.className = "status-dot inactive";
         text.textContent = "Stopped";
     }
-
-    // Update FPS display
     document.getElementById("monitor-fps").textContent = data.monitor_fps + " FPS";
 
-    // Update alarm display
     const alarmValue = document.getElementById("alarm-value");
     const alarmStatus = document.getElementById("alarm-status");
     if (data.monitor_alarm) {
-        const labels = {
-            hr_high: "HIGH HR",
-            hr_low: "LOW HR",
-            spo2_low: "LOW SpO2",
-        };
+        const labels = { hr_high: "HIGH HR", hr_low: "LOW HR", spo2_low: "LOW SpO2" };
         alarmValue.textContent = labels[data.monitor_alarm] || data.monitor_alarm;
         alarmValue.className = "alarm-on";
         alarmStatus.className = "alarm-status alarm-active";
@@ -75,254 +92,362 @@ function updateMonitorStatus(data) {
     }
 }
 
-// =============================================================================
-// Patient Monitor - Controls
-// =============================================================================
-
-// --- HR Slider: show live value as the user drags ---
 const hrSlider = document.getElementById("hr-slider");
 const hrValue = document.getElementById("hr-value");
 hrSlider.addEventListener("input", function () {
     hrValue.textContent = this.value;
 });
 
-// --- SpO2 Slider: show live value as the user drags ---
 const spo2Slider = document.getElementById("spo2-slider");
 const spo2Value = document.getElementById("spo2-value");
 spo2Slider.addEventListener("input", function () {
     spo2Value.textContent = this.value;
 });
 
-// --- Apply Vitals Button: send HR and SpO2 to the server ---
 document.getElementById("apply-vitals-btn").addEventListener("click", function () {
     fetch("/monitor/set", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            hr: parseInt(hrSlider.value),
-            spo2: parseInt(spo2Slider.value),
+            hr: parseInt(hrSlider.value, 10),
+            spo2: parseInt(spo2Slider.value, 10),
         }),
     })
         .then((r) => r.json())
-        .then((data) => {
-            if (data.error) {
-                console.error("Set vitals error:", data.error);
-            }
-        })
+        .then((data) => { if (data.error) console.error("Set vitals error:", data.error); })
         .catch((err) => console.error("Set vitals failed:", err));
 });
 
-// --- Alarm Buttons: trigger or clear alarms ---
 document.querySelectorAll("[data-alarm]").forEach(function (btn) {
     btn.addEventListener("click", function () {
         const alarmType = this.dataset.alarm;
-
-        // "clear" means set alarm to null
         const alarmValue = alarmType === "clear" ? null : alarmType;
-
         fetch("/monitor/alarm", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ alarm: alarmValue }),
         })
             .then((r) => r.json())
-            .then((data) => {
-                if (data.error) {
-                    console.error("Set alarm error:", data.error);
-                }
-            })
+            .then((data) => { if (data.error) console.error("Set alarm error:", data.error); })
             .catch((err) => console.error("Set alarm failed:", err));
     });
 });
 
 // =============================================================================
-// X-Ray Viewer - Status Updates
+// Ransomware Panel
 // =============================================================================
 
-/**
- * Update the X-ray viewer section of the dashboard with live data.
- */
-function updateXrayStatus(data) {
-    // Update status indicator
-    const dot = document.getElementById("xray-status-dot");
-    const text = document.getElementById("xray-status-text");
-    if (data.xray_running) {
+function updateRansomwarePanel(data) {
+    const dot = document.getElementById("ransomware-status-dot");
+    const text = document.getElementById("ransomware-status-text");
+    const badge = document.getElementById("ransomware-source-badge");
+    const toggleBtn = document.getElementById("ransomware-toggle-btn");
+
+    if (data.ransomware_active) {
         dot.className = "status-dot active";
-        text.textContent =
-            data.xray_status === "no_images" ? "Running (no images)" : "Running";
+        text.textContent = "Ransomware mode active";
+    } else {
+        dot.className = "status-dot inactive";
+        text.textContent = "Ransomware mode inactive";
+    }
+
+    let source = "Dashboard Off";
+    if (data.ransomware_gpio_asserted) {
+        source = data.ransomware_web_enabled ? "GPIO + Dashboard" : "GPIO";
+    } else if (data.ransomware_web_enabled) {
+        source = "Dashboard";
+    }
+    badge.textContent = "Source: " + source;
+
+    if (data.ransomware_gpio_asserted) {
+        toggleBtn.textContent = data.ransomware_web_enabled
+            ? "Dashboard Override: ON"
+            : "Dashboard Override: OFF";
+    } else {
+        toggleBtn.textContent = data.ransomware_web_enabled
+            ? "Disable Ransomware"
+            : "Enable Ransomware";
+    }
+
+    document.querySelectorAll("[data-ransomware-target]").forEach(function (card) {
+        const target = card.dataset.ransomwareTarget;
+        updateRansomwareTargetCard(card, target, data[`ransomware_${target}_image`]);
+    });
+}
+
+function updateRansomwareTargetCard(card, target, filename) {
+    const preview = q(card, "preview");
+    const deleteBtn = q(card, "delete-btn");
+    const currentName = preview.dataset.filename || "";
+
+    deleteBtn.disabled = !filename;
+
+    if (!filename) {
+        if (currentName !== "") {
+            preview.innerHTML = '<p class="no-images-msg">No ransomware image uploaded.</p>';
+            preview.dataset.filename = "";
+        }
+        return;
+    }
+
+    if (currentName === filename) return;
+
+    preview.dataset.filename = filename;
+    preview.innerHTML = `
+        <img src="/ransomware/${target}/image/${encodeURIComponent(filename)}"
+             alt="${filename}" loading="lazy">
+        <div class="image-name">${filename}</div>
+    `;
+}
+
+document.getElementById("ransomware-toggle-btn").addEventListener("click", function () {
+    fetch("/ransomware/toggle", { method: "POST" })
+        .then((r) => r.json())
+        .then((data) => { if (data.error) console.error("Toggle ransomware error:", data.error); })
+        .catch((err) => console.error("Toggle ransomware failed:", err));
+});
+
+function wireRansomwareTargetCard(card) {
+    const target = card.dataset.ransomwareTarget;
+    const uploadArea = q(card, "upload-area");
+    const fileInput = q(card, "file-input");
+    const uploadStatus = q(card, "upload-status");
+    const deleteBtn = q(card, "delete-btn");
+
+    uploadArea.addEventListener("click", function () { fileInput.click(); });
+    fileInput.addEventListener("change", function () {
+        if (this.files.length > 0) {
+            uploadRansomwareFile(target, this.files[0], fileInput, uploadStatus);
+        }
+    });
+
+    uploadArea.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        this.classList.add("drag-over");
+    });
+    uploadArea.addEventListener("dragleave", function () {
+        this.classList.remove("drag-over");
+    });
+    uploadArea.addEventListener("drop", function (e) {
+        e.preventDefault();
+        this.classList.remove("drag-over");
+        if (e.dataTransfer.files.length > 0) {
+            uploadRansomwareFile(target, e.dataTransfer.files[0], fileInput, uploadStatus);
+        }
+    });
+
+    deleteBtn.addEventListener("click", function () {
+        fetch(`/ransomware/${target}`, { method: "DELETE" })
+            .then((r) => r.json())
+            .then((data) => { if (data.error) console.error("Delete ransomware image error:", data.error); })
+            .catch((err) => console.error("Delete ransomware image failed:", err));
+    });
+}
+
+function uploadRansomwareFile(target, file, fileInput, uploadStatus) {
+    uploadStatus.textContent = "Uploading " + file.name + "...";
+    uploadStatus.className = "upload-status";
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    fetch(`/ransomware/${target}/upload`, { method: "POST", body: formData })
+        .then((r) => r.json())
+        .then((data) => {
+            if (data.ok) {
+                uploadStatus.textContent = "Uploaded for " + labelForRansomwareTarget(target);
+                uploadStatus.className = "upload-status success";
+            } else {
+                uploadStatus.textContent = "Error: " + data.error;
+                uploadStatus.className = "upload-status error";
+            }
+            fileInput.value = "";
+        })
+        .catch((err) => {
+            uploadStatus.textContent = "Upload failed: " + err;
+            uploadStatus.className = "upload-status error";
+        });
+}
+
+document.querySelectorAll("[data-ransomware-target]").forEach(wireRansomwareTargetCard);
+
+// =============================================================================
+// X-Ray Panels (per-display)
+// =============================================================================
+
+function updateAllXrayPanels(data) {
+    document.querySelectorAll(".xray-panel").forEach(function (panel) {
+        updateXrayPanel(panel, data);
+    });
+}
+
+function updateXrayPanel(panel, data) {
+    const id = panel.dataset.displayId;
+    const running = data[`${id}_running`];
+    const status = data[`${id}_status`];
+    const autoPlay = data[`${id}_auto_play`];
+    const interval = data[`${id}_interval`];
+    const images = data[`${id}_images`] || [];
+    const currentIndex = data[`${id}_current_index`] || 0;
+
+    const dot = q(panel, "status-dot");
+    const text = q(panel, "status-text");
+    if (running) {
+        if (status === "disconnected") {
+            dot.className = "status-dot warning";
+            text.textContent = "Assigned HDMI disconnected";
+        } else {
+            dot.className = "status-dot active";
+        }
+        if (status === "ransomware") {
+            text.textContent = "Ransomware override";
+        } else if (status === "no_images") {
+            text.textContent = "Running (no images)";
+        } else if (status === "disconnected") {
+            text.textContent = "Assigned HDMI disconnected";
+        } else {
+            text.textContent = "Running";
+        }
     } else {
         dot.className = "status-dot inactive";
         text.textContent = "Stopped";
     }
 
-    // Update auto-play button text
-    document.getElementById("auto-play-btn").textContent =
-        "Auto-Play: " + (data.xray_auto_play ? "ON" : "OFF");
+    q(panel, "auto-play-btn").textContent = "Auto-Play: " + (autoPlay ? "ON" : "OFF");
 
-    // Update interval slider (only if the user isn't actively dragging)
-    const intervalSlider = document.getElementById("interval-slider");
-    if (document.activeElement !== intervalSlider) {
-        intervalSlider.value = data.xray_interval;
-        document.getElementById("interval-value").textContent = data.xray_interval;
+    const intervalSlider = q(panel, "interval-slider");
+    const intervalValue = q(panel, "interval-value");
+    const intervalDirty = panel.dataset.intervalDirty === "true";
+    if (!intervalDirty && document.activeElement !== intervalSlider) {
+        intervalSlider.value = interval;
+        intervalValue.textContent = interval;
     }
 
-    // Update the image gallery
-    updateImageGallery(data.xray_images, data.xray_current_index);
+    updateImageGallery(panel, id, images, currentIndex);
 }
 
-// =============================================================================
-// X-Ray Viewer - Image Gallery
-// =============================================================================
+function updateImageGallery(panel, id, images, currentIndex) {
+    const gallery = q(panel, "image-gallery");
+    q(panel, "image-count").textContent = images.length;
 
-/**
- * Rebuild the image gallery with the current list of images.
- * Highlights the currently displayed image.
- */
-function updateImageGallery(images, currentIndex) {
-    const gallery = document.getElementById("image-gallery");
-    const countEl = document.getElementById("image-count");
-    countEl.textContent = images.length;
-
-    // If no images, show placeholder
     if (images.length === 0) {
-        gallery.innerHTML = '<p class="no-images-msg">No images uploaded yet.</p>';
+        if (gallery.dataset.imageList !== "") {
+            gallery.innerHTML = '<p class="no-images-msg">No images uploaded yet.</p>';
+            gallery.dataset.imageList = "";
+            gallery.dataset.currentIndex = "";
+        }
         return;
     }
 
-    // Build the gallery HTML
-    // Only rebuild if the image list changed (avoids flicker)
-    const currentHtml = gallery.dataset.imageList || "";
     const newList = images.join(",");
     const indexChanged = gallery.dataset.currentIndex !== String(currentIndex);
+    if (gallery.dataset.imageList === newList && !indexChanged) return;
 
-    if (currentHtml !== newList || indexChanged) {
-        gallery.dataset.imageList = newList;
-        gallery.dataset.currentIndex = String(currentIndex);
+    gallery.dataset.imageList = newList;
+    gallery.dataset.currentIndex = String(currentIndex);
 
-        let html = "";
-        for (let i = 0; i < images.length; i++) {
-            const isCurrent = i === currentIndex ? " current" : "";
-            const name = images[i];
-            html += `
-                <div class="image-card${isCurrent}" data-index="${i}" data-filename="${name}">
-                    <img src="/xray/image/${encodeURIComponent(name)}"
-                         alt="${name}" loading="lazy">
-                    <div class="image-name">${name}</div>
-                    <button class="delete-btn" title="Remove image">&times;</button>
-                </div>
-            `;
-        }
-        gallery.innerHTML = html;
-
-        // Attach click handlers for selecting and deleting images
-        gallery.querySelectorAll(".image-card").forEach(function (card) {
-            // Click on card = jump to that image
-            card.addEventListener("click", function (e) {
-                // Don't jump if they clicked the delete button
-                if (e.target.classList.contains("delete-btn")) return;
-
-                const index = parseInt(this.dataset.index);
-                fetch("/xray/set-index", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ index: index }),
-                }).catch((err) => console.error("Set index failed:", err));
-            });
-
-            // Click on delete button = remove image
-            card.querySelector(".delete-btn").addEventListener("click", function () {
-                const filename = card.dataset.filename;
-                if (!confirm("Remove " + filename + " from rotation?")) return;
-
-                fetch("/xray/" + encodeURIComponent(filename), {
-                    method: "DELETE",
-                }).catch((err) => console.error("Delete failed:", err));
-            });
-        });
+    let html = "";
+    for (let i = 0; i < images.length; i++) {
+        const isCurrent = i === currentIndex ? " current" : "";
+        const name = images[i];
+        html += `
+            <div class="image-card${isCurrent}" data-index="${i}" data-filename="${name}">
+                <img src="/xray/${id}/image/${encodeURIComponent(name)}"
+                     alt="${name}" loading="lazy">
+                <div class="image-name">${name}</div>
+                <button class="delete-btn" title="Remove image">&times;</button>
+            </div>
+        `;
     }
+    gallery.innerHTML = html;
+
+    gallery.querySelectorAll(".image-card").forEach(function (card) {
+        card.addEventListener("click", function (e) {
+            if (e.target.classList.contains("delete-btn")) return;
+            const index = parseInt(this.dataset.index, 10);
+            fetch(`/xray/${id}/set-index`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ index: index }),
+            }).catch((err) => console.error("Set index failed:", err));
+        });
+        card.querySelector(".delete-btn").addEventListener("click", function () {
+            const filename = card.dataset.filename;
+            if (!confirm("Remove " + filename + " from rotation?")) return;
+            fetch(`/xray/${id}/${encodeURIComponent(filename)}`, { method: "DELETE" })
+                .catch((err) => console.error("Delete failed:", err));
+        });
+    });
 }
 
-// =============================================================================
-// X-Ray Viewer - Slideshow Controls
-// =============================================================================
+function wireXrayPanel(panel) {
+    const id = panel.dataset.displayId;
 
-// --- Auto-Play Toggle ---
-document.getElementById("auto-play-btn").addEventListener("click", function () {
-    fetch("/xray/toggle-auto", { method: "POST" }).catch((err) =>
-        console.error("Toggle auto failed:", err)
-    );
-});
+    q(panel, "auto-play-btn").addEventListener("click", function () {
+        fetch(`/xray/${id}/toggle-auto`, { method: "POST" })
+            .catch((err) => console.error("Toggle auto failed:", err));
+    });
 
-// --- Interval Slider: show live value ---
-const intervalSlider = document.getElementById("interval-slider");
-const intervalValue = document.getElementById("interval-value");
-intervalSlider.addEventListener("input", function () {
-    intervalValue.textContent = this.value;
-});
+    const intervalSlider = q(panel, "interval-slider");
+    const intervalValue = q(panel, "interval-value");
+    intervalSlider.addEventListener("input", function () {
+        panel.dataset.intervalDirty = "true";
+        intervalValue.textContent = this.value;
+    });
 
-// --- Apply Interval Button ---
-document.getElementById("apply-interval-btn").addEventListener("click", function () {
-    fetch("/xray/set-interval", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interval: parseInt(intervalSlider.value) }),
-    }).catch((err) => console.error("Set interval failed:", err));
-});
+    q(panel, "apply-interval-btn").addEventListener("click", function () {
+        fetch(`/xray/${id}/set-interval`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ interval: parseInt(intervalSlider.value, 10) }),
+        })
+            .then((r) => r.json())
+            .then((data) => {
+                if (data.error) {
+                    console.error("Set interval error:", data.error);
+                    return;
+                }
+                panel.dataset.intervalDirty = "false";
+                intervalSlider.value = data.interval;
+                intervalValue.textContent = data.interval;
+            })
+            .catch((err) => console.error("Set interval failed:", err));
+    });
 
-// =============================================================================
-// X-Ray Viewer - Image Upload
-// =============================================================================
+    const uploadArea = q(panel, "upload-area");
+    const fileInput = q(panel, "file-input");
+    const uploadStatus = q(panel, "upload-status");
 
-const uploadArea = document.getElementById("upload-area");
-const fileInput = document.getElementById("file-input");
-const uploadStatus = document.getElementById("upload-status");
+    uploadArea.addEventListener("click", function () { fileInput.click(); });
 
-// Click on the upload area opens the file picker
-uploadArea.addEventListener("click", function () {
-    fileInput.click();
-});
+    fileInput.addEventListener("change", function () {
+        if (this.files.length > 0) uploadXrayFile(id, this.files[0], fileInput, uploadStatus);
+    });
 
-// When a file is selected via the picker, upload it
-fileInput.addEventListener("change", function () {
-    if (this.files.length > 0) {
-        uploadFile(this.files[0]);
-    }
-});
+    uploadArea.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        this.classList.add("drag-over");
+    });
+    uploadArea.addEventListener("dragleave", function () {
+        this.classList.remove("drag-over");
+    });
+    uploadArea.addEventListener("drop", function (e) {
+        e.preventDefault();
+        this.classList.remove("drag-over");
+        if (e.dataTransfer.files.length > 0) {
+            uploadXrayFile(id, e.dataTransfer.files[0], fileInput, uploadStatus);
+        }
+    });
+}
 
-// --- Drag and drop support ---
-uploadArea.addEventListener("dragover", function (e) {
-    e.preventDefault();
-    this.classList.add("drag-over");
-});
-
-uploadArea.addEventListener("dragleave", function () {
-    this.classList.remove("drag-over");
-});
-
-uploadArea.addEventListener("drop", function (e) {
-    e.preventDefault();
-    this.classList.remove("drag-over");
-    if (e.dataTransfer.files.length > 0) {
-        uploadFile(e.dataTransfer.files[0]);
-    }
-});
-
-/**
- * Upload a single image file to the server.
- */
-function uploadFile(file) {
-    // Show uploading status
+function uploadXrayFile(id, file, fileInput, uploadStatus) {
     uploadStatus.textContent = "Uploading " + file.name + "...";
     uploadStatus.className = "upload-status";
 
-    // Build the multipart form data
     const formData = new FormData();
     formData.append("image", file);
 
-    fetch("/xray/upload", {
-        method: "POST",
-        body: formData,
-    })
+    fetch(`/xray/${id}/upload`, { method: "POST", body: formData })
         .then((r) => r.json())
         .then((data) => {
             if (data.ok) {
@@ -332,7 +457,6 @@ function uploadFile(file) {
                 uploadStatus.textContent = "Error: " + data.error;
                 uploadStatus.className = "upload-status error";
             }
-            // Clear the file input so the same file can be re-uploaded
             fileInput.value = "";
         })
         .catch((err) => {
@@ -341,24 +465,21 @@ function uploadFile(file) {
         });
 }
 
+document.querySelectorAll(".xray-panel").forEach(wireXrayPanel);
+
 // =============================================================================
 // Initial Load
 // =============================================================================
 
-// Fetch the current status on page load (in case SocketIO takes a moment)
 fetch("/status")
     .then((r) => r.json())
     .then((data) => {
-        // Set slider positions to match current state
         hrSlider.value = data.monitor_hr;
         hrValue.textContent = data.monitor_hr;
         spo2Slider.value = data.monitor_spo2;
         spo2Value.textContent = data.monitor_spo2;
-        intervalSlider.value = data.xray_interval;
-        intervalValue.textContent = data.xray_interval;
-
-        // Update all status displays
         updateMonitorStatus(data);
-        updateXrayStatus(data);
+        updateRansomwarePanel(data);
+        updateAllXrayPanels(data);
     })
     .catch((err) => console.error("Initial status fetch failed:", err));

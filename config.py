@@ -25,8 +25,8 @@ SPI_SPEED_HZ = 40_000_000  # SPI clock speed in Hz (40 MHz, Seengreat default is
 # Patient Monitor Display Settings
 # =============================================================================
 
-MONITOR_WIDTH = 240       # Display width in pixels
-MONITOR_HEIGHT = 320      # Display height in pixels
+MONITOR_WIDTH = 320       # Display width in pixels (landscape)
+MONITOR_HEIGHT = 240      # Display height in pixels (landscape)
 MONITOR_TARGET_FPS = 30   # Target frames per second for animation
 MONITOR_ROTATION = 0      # Display rotation (0=portrait, 90/180/270)
 
@@ -34,16 +34,31 @@ MONITOR_ROTATION = 0      # Display rotation (0=portrait, 90/180/270)
 # X-Ray Viewer Display Settings
 # =============================================================================
 
-# The Pi 5 has two HDMI outputs. The 4" touchscreen plugs into one of them.
-# Under X11, we position the pygame window on the correct display.
-# Under KMS/DRM (headless), we target a specific DRM device.
-HDMI_DISPLAY_INDEX = 1    # Which HDMI output (0 = primary, 1 = secondary)
-
-# Environment variables set before pygame.init() to target the right display.
-# Adjust these based on your Pi's display configuration.
-HDMI_DISPLAY_ENV = {
-    "SDL_VIDEO_WINDOW_POS": "0,0",  # Position window at top-left of target display
-}
+# The Pi 5 has two HDMI outputs. We run one slideshow process per output, each
+# with its own image directory and independent playback state.
+#
+# `connector_names` lists stable output names to probe at runtime. Different
+# display stacks report slightly different names for the same physical port:
+#   - Wayland / wlroots: HDMI-A-1, HDMI-A-2
+#   - X11 / Xwayland:    HDMI-1, HDMI-2
+#
+# The ordering here is physical, not "currently connected monitor #N":
+#   - xray1 = the port nearest USB-C power
+#   - xray2 = the other HDMI port
+XRAY_DISPLAYS = [
+    {
+        "id": "xray1",
+        "hdmi_index": 0,
+        "label": "X-Ray Display 1",
+        "connector_names": ["HDMI-A-1", "HDMI-1", "HDMI1"],
+    },
+    {
+        "id": "xray2",
+        "hdmi_index": 1,
+        "label": "X-Ray Display 2",
+        "connector_names": ["HDMI-A-2", "HDMI-2", "HDMI2"],
+    },
+]
 
 XRAY_SLIDESHOW_FPS = 15       # FPS for the X-ray viewer (low is fine for stills)
 XRAY_DEFAULT_INTERVAL = 8     # Default seconds between auto-advance
@@ -57,14 +72,39 @@ WEB_HOST = "0.0.0.0"     # Listen on all interfaces (accessible on local network
 WEB_PORT = 5000           # HTTP port for the web portal
 
 # =============================================================================
+# Ransomware Trigger Settings
+# =============================================================================
+
+RANSOMWARE_GPIO_PIN = 23   # BCM GPIO input for physical ransomware trigger
+
+# =============================================================================
 # File Paths
 # =============================================================================
 
 # Base directory of the project (where main.py lives)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Directory where uploaded X-ray images are stored
-XRAY_DIR = os.path.join(BASE_DIR, "data", "xrays")
+# Base directory for all X-ray images. Each display has its own subdirectory
+# (e.g. data/xrays/xray1/, data/xrays/xray2/).
+XRAY_BASE_DIR = os.path.join(BASE_DIR, "data", "xrays")
+
+# Base directory for ransomware images. Each physical display has its own
+# subdirectory: monitor/, xray1/, xray2/.
+RANSOMWARE_BASE_DIR = os.path.join(BASE_DIR, "data", "ransomware")
+
+# Persistent settings cache written by the web/UI control layer so the app can
+# restore operator-selected values after restart.
+SETTINGS_CACHE_PATH = os.path.join(BASE_DIR, "data", "settings.json")
+
+
+def xray_dir_for(display_id):
+    """Return the image directory for a specific xray display."""
+    return os.path.join(XRAY_BASE_DIR, display_id)
+
+
+def ransomware_dir_for(target):
+    """Return the ransomware image directory for a specific display target."""
+    return os.path.join(RANSOMWARE_BASE_DIR, target)
 
 # Allowed image file extensions for X-ray uploads
 ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"}

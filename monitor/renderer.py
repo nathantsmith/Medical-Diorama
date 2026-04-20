@@ -1,28 +1,17 @@
 """
 monitor/renderer.py - Composes each frame of the patient monitor display.
 
-The monitor screen layout (240 wide x 320 tall, portrait orientation):
-
-    ┌──────────────────────────┐
-    │  ♥  HR: 72 BPM     [top]│  <- 40px: heart rate text (green)
-    ├──────────────────────────┤
-    │                          │
-    │   ECG Waveform Area      │  <- 100px: scrolling ECG trace (green)
-    │                          │
-    ├──────────────────────────┤
-    │  SpO2: 98%          [mid]│  <- 40px: blood oxygen text (cyan)
-    ├──────────────────────────┤
-    │                          │
-    │   SpO2 Waveform Area     │  <- 100px: scrolling pleth trace (cyan)
-    │                          │
-    ├──────────────────────────┤
-    │  ALARM STATUS BAR   [bot]│  <- 40px: alarm indicator (red flash)
-    └──────────────────────────┘
+The monitor runs in landscape (320x240). Layout is split vertically into:
+- HR text row
+- ECG waveform area
+- SpO2 text row
+- Pleth waveform area
+- Alarm bar
 
 Each frame is rendered as a fresh PIL Image that gets pushed to the display.
 """
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from config import (
     MONITOR_WIDTH, MONITOR_HEIGHT,
@@ -35,32 +24,27 @@ from monitor.waveforms import ECGWaveform, SpO2Waveform
 # Layout Constants (pixel positions for each section)
 # =============================================================================
 
-# Heart rate text section
 HR_SECTION_TOP = 0
-HR_SECTION_HEIGHT = 40
+HR_SECTION_HEIGHT = 32
 
-# ECG waveform drawing area
-ECG_SECTION_TOP = HR_SECTION_HEIGHT
-ECG_SECTION_HEIGHT = 100
+ECG_SECTION_TOP = HR_SECTION_TOP + HR_SECTION_HEIGHT
+ECG_SECTION_HEIGHT = 72
 
-# SpO2 text section
 SPO2_SECTION_TOP = ECG_SECTION_TOP + ECG_SECTION_HEIGHT
-SPO2_SECTION_HEIGHT = 40
+SPO2_SECTION_HEIGHT = 32
 
-# SpO2 waveform drawing area
 PLETH_SECTION_TOP = SPO2_SECTION_TOP + SPO2_SECTION_HEIGHT
-PLETH_SECTION_HEIGHT = 100
+PLETH_SECTION_HEIGHT = 72
 
-# Alarm status bar at the bottom
 ALARM_SECTION_TOP = PLETH_SECTION_TOP + PLETH_SECTION_HEIGHT
-ALARM_SECTION_HEIGHT = MONITOR_HEIGHT - ALARM_SECTION_TOP  # fills remaining space
+ALARM_SECTION_HEIGHT = MONITOR_HEIGHT - ALARM_SECTION_TOP
 
 
 class MonitorRenderer:
     """
     Renders the patient monitor display frame by frame.
 
-    Creates a 240x320 PIL Image each frame containing:
+    Creates a 320x240 PIL Image each frame containing:
     - Heart rate reading and label
     - Scrolling ECG waveform
     - SpO2 reading and label
@@ -125,7 +109,7 @@ class MonitorRenderer:
             time_offset: Current time in seconds (for waveform scrolling).
 
         Returns:
-            A PIL.Image.Image (240x320, RGB mode) ready to push to the display.
+            A PIL.Image.Image (320x240, RGB mode) ready to push to the display.
         """
         self._frame_count += 1
 
@@ -149,6 +133,39 @@ class MonitorRenderer:
 
         return image
 
+    def render_ransomware_frame(self, image_path=None):
+        """
+        Render the ransomware override screen for the patient monitor.
+
+        If an uploaded image is available, it is scaled to fit the screen.
+        Otherwise a built-in warning layout is rendered.
+        """
+        if image_path:
+            try:
+                with Image.open(image_path) as source:
+                    return self._fit_image_to_screen(source.convert("RGB"))
+            except Exception:
+                pass
+
+        image = Image.new("RGB", (MONITOR_WIDTH, MONITOR_HEIGHT), COLOR_BLACK)
+        draw = ImageDraw.Draw(image)
+        draw.rectangle([0, 0, MONITOR_WIDTH, MONITOR_HEIGHT], outline=COLOR_RED, width=4)
+        draw.text((18, 28), "RANSOMWARE", fill=COLOR_RED, font=self._font_large)
+        draw.text((18, 72), "DEVICE LOCKED", fill=COLOR_WHITE, font=self._font_medium)
+        draw.text((18, 110), "Upload a monitor", fill=COLOR_YELLOW, font=self._font_small)
+        draw.text((18, 132), "ransom screen in", fill=COLOR_YELLOW, font=self._font_small)
+        draw.text((18, 154), "the web portal.", fill=COLOR_YELLOW, font=self._font_small)
+        return image
+
+    def _fit_image_to_screen(self, source):
+        """Scale an uploaded image into a centered letterboxed monitor frame."""
+        background = Image.new("RGB", (MONITOR_WIDTH, MONITOR_HEIGHT), COLOR_BLACK)
+        fitted = ImageOps.contain(source, (MONITOR_WIDTH, MONITOR_HEIGHT))
+        x = (MONITOR_WIDTH - fitted.width) // 2
+        y = (MONITOR_HEIGHT - fitted.height) // 2
+        background.paste(fitted, (x, y))
+        return background
+
     def _draw_hr_section(self, draw, hr, alarm):
         """
         Draw the heart rate text section at the top of the screen.
@@ -169,9 +186,9 @@ class MonitorRenderer:
 
         # Draw the heart symbol and BPM value
         # Use a heart character (or "HR" if font doesn't support it)
-        draw.text((8, 8), "HR", fill=text_color, font=self._font_medium)
-        draw.text((50, 4), f"{hr}", fill=text_color, font=self._font_large)
-        draw.text((130, 12), "BPM", fill=text_color, font=self._font_small)
+        draw.text((8, 5), "HR", fill=text_color, font=self._font_medium)
+        draw.text((52, 1), f"{hr}", fill=text_color, font=self._font_large)
+        draw.text((136, 10), "BPM", fill=text_color, font=self._font_small)
 
     def _draw_ecg_waveform(self, draw, bpm, time_offset):
         """
@@ -220,9 +237,9 @@ class MonitorRenderer:
             text_color = COLOR_CYAN
 
         # Draw the SpO2 label and value
-        draw.text((8, SPO2_SECTION_TOP + 8), "SpO2", fill=text_color, font=self._font_medium)
-        draw.text((80, SPO2_SECTION_TOP + 4), f"{spo2}", fill=text_color, font=self._font_large)
-        draw.text((150, SPO2_SECTION_TOP + 12), "%", fill=text_color, font=self._font_small)
+        draw.text((8, SPO2_SECTION_TOP + 5), "SpO2", fill=text_color, font=self._font_medium)
+        draw.text((80, SPO2_SECTION_TOP + 1), f"{spo2}", fill=text_color, font=self._font_large)
+        draw.text((150, SPO2_SECTION_TOP + 10), "%", fill=text_color, font=self._font_small)
 
     def _draw_pleth_waveform(self, draw, bpm, time_offset):
         """
@@ -275,7 +292,7 @@ class MonitorRenderer:
             if is_flash_on:
                 # Red background with white alarm text
                 draw.rectangle(
-                    [0, ALARM_SECTION_TOP, MONITOR_WIDTH, MONITOR_HEIGHT],
+                    [0, ALARM_SECTION_TOP, MONITOR_WIDTH - 1, MONITOR_HEIGHT - 1],
                     fill=COLOR_RED,
                 )
                 # Show which alarm is active
@@ -286,13 +303,13 @@ class MonitorRenderer:
                 }
                 label = alarm_labels.get(alarm, "ALARM")
                 draw.text(
-                    (8, ALARM_SECTION_TOP + 4),
+                    (8, ALARM_SECTION_TOP + 2),
                     f"!! ALARM !!",
                     fill=COLOR_WHITE,
                     font=self._font_large,
                 )
                 draw.text(
-                    (8, ALARM_SECTION_TOP + 28),
+                    (170, ALARM_SECTION_TOP + 8),
                     label,
                     fill=COLOR_YELLOW,
                     font=self._font_medium,
@@ -300,7 +317,7 @@ class MonitorRenderer:
             else:
                 # Flash off — black bar (creates blinking effect)
                 draw.rectangle(
-                    [0, ALARM_SECTION_TOP, MONITOR_WIDTH, MONITOR_HEIGHT],
+                    [0, ALARM_SECTION_TOP, MONITOR_WIDTH - 1, MONITOR_HEIGHT - 1],
                     fill=COLOR_BLACK,
                 )
 

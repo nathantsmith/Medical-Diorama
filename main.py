@@ -24,13 +24,18 @@ import multiprocessing
 import os
 import signal
 import sys
+import threading
 import time
+from contextlib import contextmanager
 
 # Add the project root to the Python path so all imports work
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import XRAY_DIR
-from shared.state import create_state, scan_xray_images
+from config import XRAY_DISPLAYS, XRAY_BASE_DIR, RANSOMWARE_BASE_DIR, SETTINGS_CACHE_PATH
+from shared.ransomware import ransomware_targets
+from shared.settings_store import load_settings, reconcile_persisted_assets, save_settings
+from shared.logging_utils import configure_logging
+from shared.state import create_state, scan_all_xray_images
 
 
 def parse_args():
@@ -74,12 +79,24 @@ def setup_logging(level_name):
     Each log message includes the process name so you can tell which
     process (Monitor, XRay, Web) generated it.
     """
-    level = getattr(logging, level_name)
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s [%(processName)s] %(name)s %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
+    configure_logging(level_name)
+
+
+@contextmanager
+def temporarily_ignore_sigint():
+    """
+    Ignore SIGINT for a short critical section.
+
+    Child interpreters created via the 'spawn' start method inherit ignored
+    signal dispositions across exec, which prevents Ctrl+C from raising
+    import-time KeyboardInterrupt tracebacks in each child.
+    """
+    previous_handler = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGINT, previous_handler)
 
 
 def main():
@@ -106,16 +123,27 @@ def main():
     # All child processes get a reference to this same dict and can read/write
     # it safely across process boundaries.
     logger.info("Creating shared state manager...")
-    manager = multiprocessing.Manager()
+    with temporarily_ignore_sigint():
+        manager = multiprocessing.Manager()
     state = create_state(manager)
 
     # =========================================================================
-    # Step 2: Scan for existing X-ray images
+    # Step 2: Scan for existing X-ray images (one directory per display)
     # =========================================================================
-    os.makedirs(XRAY_DIR, exist_ok=True)
-    scan_xray_images(state)
-    image_count = len(list(state.get("xray_images", [])))
-    logger.info("Found %d X-ray image(s) in %s", image_count, XRAY_DIR)
+    os.makedirs(XRAY_BASE_DIR, exist_ok=True)
+    for display in XRAY_DISPLAYS:
+        os.makedirs(os.path.join(XRAY_BASE_DIR, display["id"]), exist_ok=True)
+    for target in ransomware_targets():
+        os.makedirs(os.path.join(RANSOMWARE_BASE_DIR, target), exist_ok=True)
+    if load_settings(state):
+        logger.info("Loaded persisted settings from %s", SETTINGS_CACHE_PATH)
+    scan_all_xray_images(state)
+    if reconcile_persisted_assets(state):
+        save_settings(state)
+    for display in XRAY_DISPLAYS:
+        display_id = display["id"]
+        count = len(list(state.get(f"{display_id}_images", [])))
+        logger.info("Display %s: %d image(s)", display_id, count)
 
     # =========================================================================
     # Step 3: Create the shutdown event
@@ -123,6 +151,20 @@ def main():
     # This event is shared across all processes. When set, each process's
     # main loop will exit gracefully.
     shutdown_event = multiprocessing.Event()
+
+    gpio_thread = None
+    try:
+        from ransomware_gpio import start_watcher as start_ransomware_gpio_watcher
+
+        gpio_thread = threading.Thread(
+            target=start_ransomware_gpio_watcher,
+            args=(state, shutdown_event, args.mock_hardware),
+            name="RansomwareGPIO",
+            daemon=True,
+        )
+        gpio_thread.start()
+    except Exception as exc:
+        logger.warning("Failed to start ransomware GPIO watcher: %s", exc)
 
     # =========================================================================
     # Step 4: Spawn child processes
@@ -134,7 +176,7 @@ def main():
         from monitor.process import run as monitor_run
         monitor_proc = multiprocessing.Process(
             target=monitor_run,
-            args=(state, shutdown_event, args.mock_hardware),
+            args=(state, shutdown_event, args.mock_hardware, args.log_level),
             name="Monitor",
             daemon=True,
         )
@@ -142,18 +184,31 @@ def main():
     else:
         logger.info("Patient monitor process SKIPPED (--no-monitor)")
 
-    # --- X-Ray Viewer Process ---
+    # --- X-Ray Viewer Processes (one per display) ---
     if not args.no_xray:
         from xray.process import run as xray_run
-        xray_proc = multiprocessing.Process(
-            target=xray_run,
-            args=(state, shutdown_event, args.mock_hardware),
-            name="XRay",
-            daemon=True,
-        )
-        processes.append(("XRay", xray_proc))
+        for display in XRAY_DISPLAYS:
+            display_id = display["id"]
+            hdmi_index = display["hdmi_index"]
+            connector_names = display.get("connector_names", [])
+            proc_name = f"XRay-{display_id}"
+            xray_proc = multiprocessing.Process(
+                target=xray_run,
+                args=(
+                    state,
+                    shutdown_event,
+                    display_id,
+                    hdmi_index,
+                    args.mock_hardware,
+                    connector_names,
+                    args.log_level,
+                ),
+                name=proc_name,
+                daemon=True,
+            )
+            processes.append((proc_name, xray_proc))
     else:
-        logger.info("X-ray viewer process SKIPPED (--no-xray)")
+        logger.info("X-ray viewer processes SKIPPED (--no-xray)")
 
     # --- Web Portal Process ---
     from web.app import run_server as web_run
@@ -166,9 +221,10 @@ def main():
     processes.append(("Web", web_proc))
 
     # Start all processes
-    for name, proc in processes:
-        proc.start()
-        logger.info("Started %s process (PID %d)", name, proc.pid)
+    with temporarily_ignore_sigint():
+        for name, proc in processes:
+            proc.start()
+            logger.info("Started %s process (PID %d)", name, proc.pid)
 
     logger.info("-" * 60)
     logger.info("  All processes running!")
@@ -215,6 +271,9 @@ def main():
             proc.join(timeout=2)
 
     # Shut down the Manager
+    if gpio_thread is not None and gpio_thread.is_alive():
+        gpio_thread.join(timeout=1)
+
     try:
         manager.shutdown()
     except Exception:

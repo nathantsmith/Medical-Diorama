@@ -278,18 +278,13 @@ class SPIDisplay:
         """
         Push a PIL Image to the display.
 
-        Accepts a 240x320 RGB PIL Image (portrait). The image is automatically
-        transposed and rotated to match the Seengreat display's native landscape
-        orientation (320x240), with MADCTL set to 0x70.
+        Accepts a 320x240 RGB PIL Image (landscape). Sent directly to the
+        panel with MADCTL=0x70 (native landscape orientation).
 
         Args:
-            image: A PIL.Image.Image in RGB mode, sized 240x320.
+            image: A PIL.Image.Image in RGB mode, sized 320x240.
         """
-        # The Seengreat display expects 320x240 landscape data with MADCTL=0x70.
-        # Transpose the 240x320 portrait image: rotate 90° CCW then flip,
-        # matching the Seengreat reference which does img.rotate(180) on a
-        # (320, 240) source image.
-        img = image.transpose(Image.TRANSPOSE).rotate(180).transpose(Image.FLIP_LEFT_RIGHT)
+        img = image
 
         # Convert PIL image to numpy array for fast RGB565 conversion
         # Shape: (height, width, 3) with values 0-255 for R, G, B
@@ -312,12 +307,12 @@ class SPIDisplay:
         # Flatten to a 1D list for SPI transfer
         pixel_data = pixel.flatten().tolist()
 
-        # Set MADCTL for landscape-rotated write (0x70), matching Seengreat code
+        # MADCTL 0x70: landscape mode matching the Seengreat reference
         self._write_cmd(0x36)
         self._write_data(0x70)
 
-        # Set the drawing window to the full display
-        self._set_window(0, 0, self._height, self._width)
+        # Set the drawing window to the full display (landscape 320x240)
+        self._set_window(0, 0, self._width, self._height)
 
         # Send pixel data over SPI in chunks (SPI has a max transfer size)
         self._gpio_write(self._dc_line, SPI_DC_PIN, 1)  # Data mode

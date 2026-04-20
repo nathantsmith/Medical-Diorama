@@ -4,6 +4,62 @@
 
 {% block content %}
 <div class="dashboard">
+    <section class="panel ransomware-panel">
+        <h2>Ransomware Simulation</h2>
+
+        <div class="status-row">
+            <span class="status-dot" id="ransomware-status-dot"></span>
+            <span id="ransomware-status-text">Connecting...</span>
+            <span class="source-badge" id="ransomware-source-badge">Source: --</span>
+        </div>
+
+        <div class="control-group">
+            <label>Mode Control</label>
+            <div class="ransomware-controls">
+                <button class="btn btn-danger" id="ransomware-toggle-btn">Toggle Ransomware</button>
+            </div>
+        </div>
+
+        <div class="collapsible-section is-collapsed" data-role="collapsible-section"
+             data-storage-key="ransomware-images">
+            <button class="collapsible-toggle" type="button" data-role="collapsible-toggle"
+                    aria-expanded="false">
+                <span>Ransomware Image Uploads and Displays</span>
+                <span class="collapsible-icon" aria-hidden="true">+</span>
+            </button>
+
+            <div class="collapsible-content" data-role="collapsible-content" hidden>
+                <div class="ransomware-target-grid">
+                    {% for target in ransomware_targets %}
+                    <div class="ransomware-target-card" data-ransomware-target="{{ target }}">
+                        <h3>
+                            {% if target == "monitor" %}
+                                Patient Monitor
+                            {% elif target == "xray1" %}
+                                X-Ray Display 1
+                            {% elif target == "xray2" %}
+                                X-Ray Display 2
+                            {% else %}
+                                {{ target }}
+                            {% endif %}
+                        </h3>
+                        <div class="upload-area ransomware-upload-area" data-role="upload-area">
+                            <input type="file" accept="image/*" hidden data-role="file-input">
+                            <p>Click or drag a ransomware image here</p>
+                        </div>
+                        <div class="upload-status" data-role="upload-status"></div>
+                        <div class="ransomware-preview" data-role="preview">
+                            <p class="no-images-msg">No ransomware image uploaded.</p>
+                        </div>
+                        <div class="ransomware-actions">
+                            <button class="btn btn-small" data-role="delete-btn">Remove Image</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- ================================================================= -->
     <!-- PATIENT MONITOR PANEL                                              -->
@@ -60,50 +116,48 @@
     </section>
 
     <!-- ================================================================= -->
-    <!-- X-RAY VIEWER PANEL                                                 -->
+    <!-- X-RAY VIEWER PANELS (one per configured HDMI display)              -->
     <!-- ================================================================= -->
-    <section class="panel xray-panel">
-        <h2>X-Ray Viewer</h2>
+    {% for display in xray_displays %}
+    <section class="panel xray-panel" data-display-id="{{ display.id }}">
+        <h2>{{ display.label }}</h2>
 
-        <!-- Live status indicator -->
         <div class="status-row">
-            <span class="status-dot" id="xray-status-dot"></span>
-            <span id="xray-status-text">Connecting...</span>
+            <span class="status-dot" data-role="status-dot"></span>
+            <span data-role="status-text">Connecting...</span>
         </div>
 
-        <!-- Slideshow Controls -->
         <div class="control-group">
             <label>Slideshow</label>
             <div class="slideshow-controls">
-                <button class="btn btn-secondary" id="auto-play-btn">Auto-Play: --</button>
+                <button class="btn btn-secondary" data-role="auto-play-btn">Auto-Play: --</button>
                 <div class="interval-row">
-                    <label for="interval-slider">Interval (sec):</label>
-                    <input type="range" id="interval-slider" min="2" max="120" value="8"
-                           class="slider slider-small">
-                    <span class="slider-value" id="interval-value">8</span>
-                    <button class="btn btn-small" id="apply-interval-btn">Set</button>
+                    <label>Interval (sec):</label>
+                    <input type="range" min="2" max="120" value="8"
+                           class="slider slider-small" data-role="interval-slider">
+                    <span class="slider-value" data-role="interval-value">8</span>
+                    <button class="btn btn-small" data-role="apply-interval-btn">Set</button>
                 </div>
             </div>
         </div>
 
-        <!-- Image Upload -->
         <div class="control-group">
             <label>Upload X-Ray Image</label>
-            <div class="upload-area" id="upload-area">
-                <input type="file" id="file-input" accept="image/*" hidden>
+            <div class="upload-area" data-role="upload-area">
+                <input type="file" accept="image/*" hidden data-role="file-input">
                 <p>Click or drag an image here to upload</p>
             </div>
-            <div class="upload-status" id="upload-status"></div>
+            <div class="upload-status" data-role="upload-status"></div>
         </div>
 
-        <!-- Image Gallery -->
         <div class="control-group">
-            <label>Images in Rotation (<span id="image-count">0</span>)</label>
-            <div class="image-gallery" id="image-gallery">
+            <label>Images in Rotation (<span data-role="image-count">0</span>)</label>
+            <div class="image-gallery" data-role="image-gallery">
                 <p class="no-images-msg">No images uploaded yet.</p>
             </div>
         </div>
     </section>
+    {% endfor %}
 </div>
 {% endblock %}
 
