@@ -35,12 +35,29 @@ MONITOR_ROTATION = 0      # Display rotation (0=portrait, 90/180/270)
 # =============================================================================
 
 # The Pi 5 has two HDMI outputs. We run one slideshow process per output, each
-# with its own image directory and independent playback state. The `hdmi_index`
-# matches pygame.display.set_mode(display=N) — 0 = HDMI0 (near USB-C power),
-# 1 = HDMI1.
+# with its own image directory and independent playback state.
+#
+# `connector_names` lists stable output names to probe at runtime. Different
+# display stacks report slightly different names for the same physical port:
+#   - Wayland / wlroots: HDMI-A-1, HDMI-A-2
+#   - X11 / Xwayland:    HDMI-1, HDMI-2
+#
+# The ordering here is physical, not "currently connected monitor #N":
+#   - xray1 = the port nearest USB-C power
+#   - xray2 = the other HDMI port
 XRAY_DISPLAYS = [
-    {"id": "xray1", "hdmi_index": 0, "label": "X-Ray Display 1"},
-    {"id": "xray2", "hdmi_index": 1, "label": "X-Ray Display 2"},
+    {
+        "id": "xray1",
+        "hdmi_index": 0,
+        "label": "X-Ray Display 1",
+        "connector_names": ["HDMI-A-1", "HDMI-1", "HDMI1"],
+    },
+    {
+        "id": "xray2",
+        "hdmi_index": 1,
+        "label": "X-Ray Display 2",
+        "connector_names": ["HDMI-A-2", "HDMI-2", "HDMI2"],
+    },
 ]
 
 XRAY_SLIDESHOW_FPS = 15       # FPS for the X-ray viewer (low is fine for stills)
@@ -55,6 +72,12 @@ WEB_HOST = "0.0.0.0"     # Listen on all interfaces (accessible on local network
 WEB_PORT = 5000           # HTTP port for the web portal
 
 # =============================================================================
+# Ransomware Trigger Settings
+# =============================================================================
+
+RANSOMWARE_GPIO_PIN = 23   # BCM GPIO input for physical ransomware trigger
+
+# =============================================================================
 # File Paths
 # =============================================================================
 
@@ -65,10 +88,23 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # (e.g. data/xrays/xray1/, data/xrays/xray2/).
 XRAY_BASE_DIR = os.path.join(BASE_DIR, "data", "xrays")
 
+# Base directory for ransomware images. Each physical display has its own
+# subdirectory: monitor/, xray1/, xray2/.
+RANSOMWARE_BASE_DIR = os.path.join(BASE_DIR, "data", "ransomware")
+
+# Persistent settings cache written by the web/UI control layer so the app can
+# restore operator-selected values after restart.
+SETTINGS_CACHE_PATH = os.path.join(BASE_DIR, "data", "settings.json")
+
 
 def xray_dir_for(display_id):
     """Return the image directory for a specific xray display."""
     return os.path.join(XRAY_BASE_DIR, display_id)
+
+
+def ransomware_dir_for(target):
+    """Return the ransomware image directory for a specific display target."""
+    return os.path.join(RANSOMWARE_BASE_DIR, target)
 
 # Allowed image file extensions for X-ray uploads
 ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"}

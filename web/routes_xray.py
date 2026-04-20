@@ -22,6 +22,7 @@ from flask_login import login_required
 from werkzeug.utils import secure_filename
 
 import config
+from shared.settings_store import save_settings
 from shared.state import scan_xray_images
 
 xray_bp = Blueprint("xray", __name__, url_prefix="/xray")
@@ -90,6 +91,7 @@ def upload_image(display_id):
 
     file.save(save_path)
     scan_xray_images(state, display_id)
+    save_settings(state)
 
     return jsonify({
         "ok": True,
@@ -118,6 +120,7 @@ def delete_image(display_id, filename):
         return jsonify({"error": f"Failed to delete: {e}"}), 500
 
     scan_xray_images(state, display_id)
+    save_settings(state)
     return jsonify({
         "ok": True,
         "images": list(state.get(f"{display_id}_images", [])),
@@ -145,6 +148,7 @@ def set_index(display_id):
 
     index = max(0, min(index, len(images) - 1))
     state[f"{display_id}_current_index"] = index
+    save_settings(state)
     return jsonify({"ok": True, "current_index": index})
 
 
@@ -156,6 +160,7 @@ def toggle_auto(display_id):
     state = current_app.config["SHARED_STATE"]
     current = state.get(f"{display_id}_auto_play", True)
     state[f"{display_id}_auto_play"] = not current
+    save_settings(state)
     return jsonify({"ok": True, "auto_play": state[f"{display_id}_auto_play"]})
 
 
@@ -177,6 +182,7 @@ def set_interval(display_id):
         return jsonify({"error": "Interval must be between 2 and 120 seconds"}), 400
 
     state[f"{display_id}_interval"] = interval
+    save_settings(state)
     return jsonify({"ok": True, "interval": interval})
 
 

@@ -12,6 +12,7 @@ Routes:
 
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required
+from shared.settings_store import save_settings
 
 # Create the blueprint — routes are prefixed with /monitor
 monitor_bp = Blueprint("monitor", __name__, url_prefix="/monitor")
@@ -64,6 +65,8 @@ def set_vitals():
     if errors:
         return jsonify({"error": "; ".join(errors)}), 400
 
+    save_settings(state)
+
     return jsonify({
         "ok": True,
         "monitor_hr": state["monitor_hr"],
@@ -105,6 +108,7 @@ def set_alarm():
 
     # Set the alarm in shared state
     state["monitor_alarm"] = alarm
+    save_settings(state)
 
     return jsonify({
         "ok": True,

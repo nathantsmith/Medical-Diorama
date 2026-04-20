@@ -18,11 +18,13 @@ import time
 import logging
 
 from config import MONITOR_TARGET_FPS, ALARM_THRESHOLDS
+from shared.logging_utils import configure_logging
+from shared.ransomware import get_image_path
 
 logger = logging.getLogger(__name__)
 
 
-def run(state, shutdown_event, mock_hardware=False):
+def run(state, shutdown_event, mock_hardware=False, log_level="INFO"):
     """
     Main entry point for the patient monitor process.
 
@@ -33,15 +35,10 @@ def run(state, shutdown_event, mock_hardware=False):
         state: A multiprocessing Manager dict with shared application state.
         shutdown_event: A multiprocessing.Event that signals shutdown.
         mock_hardware: If True, use MockSPIDisplay instead of real hardware.
+        log_level: Root logging level name for this child process.
     """
     # Set up logging for this child process (spawn mode doesn't inherit it)
-    import sys
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s [%(processName)s] %(name)s %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S",
-        stream=sys.stderr,
-    )
+    configure_logging(log_level)
 
     logger.info("Patient monitor process starting...")
 
@@ -99,6 +96,7 @@ def run(state, shutdown_event, mock_hardware=False):
             hr = state.get("monitor_hr", 72)
             spo2 = state.get("monitor_spo2", 98)
             current_alarm = state.get("monitor_alarm", None)
+            ransomware_active = state.get("ransomware_active", False)
 
             # --- Step 2: Auto-check alarm thresholds ---
             # Only auto-trigger alarms if no alarm is already set (e.g. from web UI).
@@ -120,7 +118,12 @@ def run(state, shutdown_event, mock_hardware=False):
             }
 
             # --- Step 4: Render the frame ---
-            frame = renderer.render_frame(state_snapshot, time_offset)
+            if ransomware_active:
+                frame = renderer.render_ransomware_frame(
+                    get_image_path(state, "monitor")
+                )
+            else:
+                frame = renderer.render_frame(state_snapshot, time_offset)
 
             # --- Step 5: Push frame to the display ---
             display.show(frame)

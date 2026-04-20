@@ -15,6 +15,7 @@ must be RE-ASSIGNED to trigger synchronization across processes. For example:
 
 import os
 import config
+from shared.ransomware import base_defaults as ransomware_defaults
 
 
 def _xray_defaults(display_id):
@@ -31,7 +32,7 @@ def _xray_defaults(display_id):
 
 def _base_defaults():
     """Default state shared by the monitor + general bookkeeping."""
-    return {
+    defaults = {
         # --- Patient Monitor ---
         "monitor_hr": 72,
         "monitor_spo2": 98,
@@ -40,6 +41,20 @@ def _base_defaults():
         "monitor_fps": 0,
         "monitor_running": False,
     }
+    defaults.update(ransomware_defaults())
+    return defaults
+
+
+def _default_state_dict():
+    """Materialize the full default state as a plain dictionary."""
+    defaults = {}
+    defaults.update(_base_defaults())
+    for display in config.XRAY_DISPLAYS:
+        defaults.update(_xray_defaults(display["id"]))
+    return defaults
+
+
+DEFAULT_STATE = _default_state_dict()
 
 
 def create_state(manager):
@@ -54,11 +69,8 @@ def create_state(manager):
         one set of xray_* keys per entry in config.XRAY_DISPLAYS).
     """
     state = manager.dict()
-    for key, value in _base_defaults().items():
+    for key, value in DEFAULT_STATE.items():
         state[key] = value
-    for display in config.XRAY_DISPLAYS:
-        for key, value in _xray_defaults(display["id"]).items():
-            state[key] = value
     return state
 
 

@@ -11,6 +11,7 @@ from flask import Blueprint, render_template, redirect, url_for, jsonify, curren
 from flask_login import login_required
 
 from config import XRAY_DISPLAYS, XRAY_DEFAULT_INTERVAL
+from shared.ransomware import ransomware_targets
 
 status_bp = Blueprint("status", __name__)
 
@@ -24,7 +25,11 @@ def index():
 @status_bp.route("/dashboard")
 @login_required
 def dashboard():
-    return render_template("dashboard.html", xray_displays=XRAY_DISPLAYS)
+    return render_template(
+        "dashboard.html",
+        xray_displays=XRAY_DISPLAYS,
+        ransomware_targets=ransomware_targets(),
+    )
 
 
 @status_bp.route("/status")
@@ -39,8 +44,19 @@ def get_status():
         "monitor_alarm": state.get("monitor_alarm", None),
         "monitor_fps": state.get("monitor_fps", 0),
         "monitor_running": state.get("monitor_running", False),
+        "ransomware_web_enabled": state.get("ransomware_web_enabled", False),
+        "ransomware_gpio_asserted": state.get("ransomware_gpio_asserted", False),
+        "ransomware_active": state.get("ransomware_active", False),
+        "ransomware_targets": ransomware_targets(),
         "xray_displays": [d["id"] for d in XRAY_DISPLAYS],
     }
+    for target in ransomware_targets():
+        payload[f"ransomware_{target}_image"] = state.get(
+            f"ransomware_{target}_image", None
+        )
+        payload[f"ransomware_{target}_version"] = state.get(
+            f"ransomware_{target}_version", 0
+        )
     for display in XRAY_DISPLAYS:
         did = display["id"]
         payload[f"{did}_images"] = list(state.get(f"{did}_images", []))

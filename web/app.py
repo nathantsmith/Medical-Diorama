@@ -19,6 +19,8 @@ from flask_socketio import SocketIO
 from dotenv import load_dotenv
 
 from config import WEB_HOST, WEB_PORT, BASE_DIR, XRAY_DISPLAYS
+from shared.logging_utils import configure_logging, suppress_noisy_loggers
+from shared.ransomware import ransomware_targets
 
 logger = logging.getLogger(__name__)
 
@@ -63,11 +65,13 @@ def create_app(state):
 
     # Register blueprints (route groups)
     from web.routes_monitor import monitor_bp
+    from web.routes_ransomware import ransomware_bp
     from web.routes_xray import xray_bp
     from web.routes_status import status_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(monitor_bp)
+    app.register_blueprint(ransomware_bp)
     app.register_blueprint(xray_bp)
     app.register_blueprint(status_bp)
 
@@ -112,8 +116,19 @@ def _get_state_snapshot(state):
         "monitor_alarm": state.get("monitor_alarm", None),
         "monitor_fps": state.get("monitor_fps", 0),
         "monitor_running": state.get("monitor_running", False),
+        "ransomware_web_enabled": state.get("ransomware_web_enabled", False),
+        "ransomware_gpio_asserted": state.get("ransomware_gpio_asserted", False),
+        "ransomware_active": state.get("ransomware_active", False),
+        "ransomware_targets": ransomware_targets(),
         "xray_displays": [d["id"] for d in XRAY_DISPLAYS],
     }
+    for target in ransomware_targets():
+        snapshot[f"ransomware_{target}_image"] = state.get(
+            f"ransomware_{target}_image", None
+        )
+        snapshot[f"ransomware_{target}_version"] = state.get(
+            f"ransomware_{target}_version", 0
+        )
     for display in XRAY_DISPLAYS:
         display_id = display["id"]
         snapshot[f"{display_id}_images"] = list(state.get(f"{display_id}_images", []))
@@ -161,6 +176,9 @@ def run_server(state, shutdown_event, debug=False):
                        directly here since Flask has its own shutdown).
         debug: If True, enable Flask debug mode (auto-reload, etc.).
     """
+    configure_logging("DEBUG" if debug else "INFO")
+    suppress_noisy_loggers()
+
     app, sio = create_app(state)
 
     # Start the background thread that pushes status updates

@@ -4,6 +4,62 @@
 
 {% block content %}
 <div class="dashboard">
+    <section class="panel ransomware-panel">
+        <h2>Ransomware Simulation</h2>
+
+        <div class="status-row">
+            <span class="status-dot" id="ransomware-status-dot"></span>
+            <span id="ransomware-status-text">Connecting...</span>
+            <span class="source-badge" id="ransomware-source-badge">Source: --</span>
+        </div>
+
+        <div class="control-group">
+            <label>Mode Control</label>
+            <div class="ransomware-controls">
+                <button class="btn btn-danger" id="ransomware-toggle-btn">Toggle Ransomware</button>
+            </div>
+        </div>
+
+        <div class="collapsible-section is-collapsed" data-role="collapsible-section"
+             data-storage-key="ransomware-images">
+            <button class="collapsible-toggle" type="button" data-role="collapsible-toggle"
+                    aria-expanded="false">
+                <span>Ransomware Image Uploads and Displays</span>
+                <span class="collapsible-icon" aria-hidden="true">+</span>
+            </button>
+
+            <div class="collapsible-content" data-role="collapsible-content" hidden>
+                <div class="ransomware-target-grid">
+                    {% for target in ransomware_targets %}
+                    <div class="ransomware-target-card" data-ransomware-target="{{ target }}">
+                        <h3>
+                            {% if target == "monitor" %}
+                                Patient Monitor
+                            {% elif target == "xray1" %}
+                                X-Ray Display 1
+                            {% elif target == "xray2" %}
+                                X-Ray Display 2
+                            {% else %}
+                                {{ target }}
+                            {% endif %}
+                        </h3>
+                        <div class="upload-area ransomware-upload-area" data-role="upload-area">
+                            <input type="file" accept="image/*" hidden data-role="file-input">
+                            <p>Click or drag a ransomware image here</p>
+                        </div>
+                        <div class="upload-status" data-role="upload-status"></div>
+                        <div class="ransomware-preview" data-role="preview">
+                            <p class="no-images-msg">No ransomware image uploaded.</p>
+                        </div>
+                        <div class="ransomware-actions">
+                            <button class="btn btn-small" data-role="delete-btn">Remove Image</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- ================================================================= -->
     <!-- PATIENT MONITOR PANEL                                              -->
