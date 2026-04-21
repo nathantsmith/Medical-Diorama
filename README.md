@@ -5,6 +5,47 @@ Medical Diorama runs three operator-facing subsystems on a Raspberry Pi:
 - two HDMI X-ray displays
 - a web dashboard for control, uploads, and status
 
+## Hardware pinout
+
+Wiring uses **BCM** GPIO numbers in code (`config.py`). The table lists the
+**40-pin header** pin numbers on a full-size Raspberry Pi (Pi 4 / Pi 5 style).
+
+Enable **SPI** (`SPI0`, `CE0`) in Raspberry Pi configuration before first boot
+with the display attached. Connect the LCD **GND** to any Pi **GND** pin (for
+example pin 6). **VCC** must match your module (often 3.3 V on pin 1 or 17, or
+5 V on pin 2 or 4—check the display datasheet).
+
+### Patient monitor (SPI, ST7789V)
+
+Uses `spidev0.0` (`SPI_PORT = 0`, `SPI_CS = 0`).
+
+| LCD signal | Pi function | BCM | Physical pin |
+|------------|-------------|-----|--------------|
+| MOSI / SDA | SPI0 MOSI | GPIO10 | 19 |
+| SCLK / SCL | SPI0 SCLK | GPIO11 | 23 |
+| CS | SPI0 CE0 | GPIO8 | 24 |
+| DC | GPIO out | GPIO25 | 22 |
+| RST | GPIO out | GPIO22 | 15 |
+| BL (backlight) | GPIO out | GPIO24 | 18 |
+
+### Physical ransomware trigger
+
+Input with internal pull-down in software; assert **high** to trigger.
+
+| Function | BCM | Physical pin |
+|----------|-----|--------------|
+| `RANSOMWARE_GPIO_PIN` | GPIO23 | 16 |
+
+Typical wiring: **3.3 V → switch → GPIO23**, other side of switch to **GND**
+(use a momentary or maintained contact as needed).
+
+### HDMI X-ray displays
+
+No GPIO: use **HDMI-A-1** / **HDMI-A-2** (Wayland names). **xray1** is the HDMI
+port closest to the Pi 5 USB-C power input; **xray2** is the other port.
+
+More detail and an ASCII block diagram: [docs/WIRING_DIAGRAM.md](docs/WIRING_DIAGRAM.md).
+
 ## Installer script
 
 For repeatable setup on another Pi, use:
@@ -210,20 +251,20 @@ Add to `~/.config/wayfire.ini`:
 
 ```ini
 [output:HDMI-A-1]
-transform = 90
+transform = 270
 
 [output:HDMI-A-2]
-transform = 90
+transform = 270
 ```
 
 Apply without logging out:
 
 ```bash
 WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR=/run/user/$(id -u) \
-  wlr-randr --output HDMI-A-1 --transform 90
+  wlr-randr --output HDMI-A-1 --transform 270
 ```
 
-Use `270` instead of `90` if the rotation direction is wrong for how the
+Use `90` or `180` instead of `270` if the rotation is wrong for how the
 panel is mounted. Check current state with `wlr-randr` using the same
 environment variables.
 
@@ -253,3 +294,8 @@ in the unit before installing it:
 If the X-ray windows need the desktop session's Wayland or X11 environment,
 uncomment the example `Environment=` lines in the unit and adjust them for
 the Pi user session.
+
+The installer also deploys a udev-triggered helper that restarts
+`medical-diorama.service` when the DRM subsystem reports a display topology
+change, so HDMI hotplug events can recover the X-ray windows without a manual
+restart.

@@ -1,0 +1,1 @@
+ACTION=="change", SUBSYSTEM=="drm", TAG+="systemd", ENV{SYSTEMD_WANTS}+="medical-diorama-display-hotplug.service"

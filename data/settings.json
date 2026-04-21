@@ -7,7 +7,7 @@
   "ransomware_xray1_image": "Ransomware.png",
   "ransomware_xray2_image": "Ransomware.png",
   "xray1_auto_play": false,
-  "xray1_current_index": 1,
+  "xray1_current_index": 0,
   "xray1_interval": 8,
   "xray2_auto_play": false,
   "xray2_current_index": 1,

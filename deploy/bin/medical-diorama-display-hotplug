@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+LOCK_FILE="/run/medical-diorama-display-hotplug.lock"
+STAMP_FILE="/run/medical-diorama-display-hotplug.last"
+MIN_RESTART_INTERVAL=5
+
+exec 9>"${LOCK_FILE}"
+/usr/bin/flock -n 9 || exit 0
+
+now="$(date +%s)"
+last_restart=0
+
+if [[ -f "${STAMP_FILE}" ]]; then
+    read -r last_restart < "${STAMP_FILE}" || last_restart=0
+fi
+
+if (( now - last_restart < MIN_RESTART_INTERVAL )); then
+    exit 0
+fi
+
+printf '%s\n' "${now}" > "${STAMP_FILE}"
+/bin/systemctl restart medical-diorama.service

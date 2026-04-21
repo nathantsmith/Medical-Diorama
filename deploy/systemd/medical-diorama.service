@@ -1,7 +1,7 @@
 [Unit]
 Description=Medical Diorama application
 Wants=network-online.target
-After=network-online.target graphical.target
+After=network-online.target
 
 [Service]
 Type=simple
@@ -11,7 +11,7 @@ WorkingDirectory=/home/bhv/Medical-Diorama
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=-/home/bhv/Medical-Diorama/.env
 ExecStart=/home/bhv/Medical-Diorama/.venv/bin/python /home/bhv/Medical-Diorama/main.py
-Restart=on-failure
+ Restart=always
 RestartSec=5
 KillSignal=SIGTERM
 TimeoutStopSec=20
@@ -25,4 +25,4 @@ StandardError=journal
 # Environment=DISPLAY=:0
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=graphical.target

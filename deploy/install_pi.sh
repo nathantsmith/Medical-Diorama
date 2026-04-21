@@ -11,6 +11,13 @@ INSTALL_DIR="${REPO_ROOT}"
 SERVICE_NAME="medical-diorama.service"
 SERVICE_TEMPLATE="${REPO_ROOT}/deploy/systemd/medical-diorama.service"
 SERVICE_DEST="/etc/systemd/system/${SERVICE_NAME}"
+HOTPLUG_SERVICE_NAME="medical-diorama-display-hotplug.service"
+HOTPLUG_SERVICE_TEMPLATE="${REPO_ROOT}/deploy/systemd/${HOTPLUG_SERVICE_NAME}"
+HOTPLUG_SERVICE_DEST="/etc/systemd/system/${HOTPLUG_SERVICE_NAME}"
+HOTPLUG_HELPER_SOURCE="${REPO_ROOT}/deploy/bin/medical-diorama-display-hotplug"
+HOTPLUG_HELPER_DEST="/usr/local/bin/medical-diorama-display-hotplug"
+HOTPLUG_RULE_SOURCE="${REPO_ROOT}/deploy/udev/99-medical-diorama-display-hotplug.rules"
+HOTPLUG_RULE_DEST="/etc/udev/rules.d/99-medical-diorama-display-hotplug.rules"
 ENV_FILE="${INSTALL_DIR}/.env"
 WAYFIRE_CONFIG="/home/${INSTALL_USER}/.config/wayfire.ini"
 ADMIN_USERNAME="admin"
@@ -109,7 +116,7 @@ install_apt_packages() {
         libportmidi-dev \
         libgpiod-dev \
         libgpiod2 \
-        xrandr \
+        x11-xserver-utils \
         wlr-randr
 }
 
@@ -142,7 +149,20 @@ install_service() {
         -e "s|/home/bhv/Medical-Diorama|${INSTALL_DIR}|g" \
         "${SERVICE_TEMPLATE}" > "${SERVICE_DEST}"
 
+}
+
+install_display_hotplug_restart() {
+    log "Installing display hotplug restart helper to ${HOTPLUG_HELPER_DEST}"
+    install -m 755 "${HOTPLUG_HELPER_SOURCE}" "${HOTPLUG_HELPER_DEST}"
+
+    log "Installing display hotplug unit to ${HOTPLUG_SERVICE_DEST}"
+    install -m 644 "${HOTPLUG_SERVICE_TEMPLATE}" "${HOTPLUG_SERVICE_DEST}"
+
+    log "Installing udev rule to ${HOTPLUG_RULE_DEST}"
+    install -m 644 "${HOTPLUG_RULE_SOURCE}" "${HOTPLUG_RULE_DEST}"
+
     systemctl daemon-reload
+    udevadm control --reload-rules
     systemctl enable --now "${SERVICE_NAME}"
 }
 
@@ -166,10 +186,10 @@ ensure_wayfire_rotation() {
         cat >> "${WAYFIRE_CONFIG}" <<'EOF'
 
 [output:HDMI-A-1]
-transform = 90
+transform = 270
 
 [output:HDMI-A-2]
-transform = 90
+transform = 270
 EOF
         chown "${INSTALL_USER}:${INSTALL_GROUP}" "${WAYFIRE_CONFIG}"
     else
@@ -237,6 +257,7 @@ main() {
     ensure_env_file
     ensure_wayfire_rotation
     install_service
+    install_display_hotplug_restart
 
     log "Installation complete"
     log "Web UI: http://<pi-ip>:5000"
