@@ -135,11 +135,15 @@ install_python_deps() {
 }
 
 install_service() {
+    local install_uid
+    install_uid="$(id -u "${INSTALL_USER}")"
+
     log "Installing systemd unit to ${SERVICE_DEST}"
     sed \
         -e "s|^User=.*|User=${INSTALL_USER}|" \
         -e "s|^Group=.*|Group=${INSTALL_GROUP}|" \
         -e "s|/home/bhv/Medical-Diorama|${INSTALL_DIR}|g" \
+        -e "s|/run/user/1000|/run/user/${install_uid}|g" \
         "${SERVICE_TEMPLATE}" > "${SERVICE_DEST}"
 
     systemctl daemon-reload

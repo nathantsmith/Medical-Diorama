@@ -5,6 +5,31 @@ Medical Diorama runs three operator-facing subsystems on a Raspberry Pi:
 - two HDMI X-ray displays
 - a web dashboard for control, uploads, and status
 
+## Raspberry Pi pinout
+
+The patient monitor uses Raspberry Pi SPI0 plus three GPIO control pins. The
+physical ransomware trigger uses one GPIO input with the software pull-down
+enabled.
+
+| Function | Pi signal | BCM GPIO | Physical pin | Connects to |
+|---|---|---:|---:|---|
+| SPI data | SPI0 MOSI | `GPIO10` | `19` | LCD `MOSI` / `SDA` |
+| SPI clock | SPI0 SCLK | `GPIO11` | `23` | LCD `SCLK` / `SCL` |
+| SPI chip select | SPI0 CE0 | `GPIO8` | `24` | LCD `CS` |
+| LCD data/command | GPIO | `GPIO25` | `22` | LCD `DC` |
+| LCD reset | GPIO | `GPIO22` | `15` | LCD `RST` |
+| LCD backlight | GPIO | `GPIO24` | `18` | LCD `BL` |
+| Ransomware trigger | GPIO input | `GPIO23` | `16` | Trigger signal, active high |
+| Ground | GND | n/a | e.g. `6` | LCD/trigger ground |
+| LCD power | 3V3 or 5V | n/a | `1`/`17` or `2`/`4` | LCD `VCC`, per display board |
+
+HDMI mapping:
+- `xray1`: HDMI port nearest the Pi 5 USB-C power connector
+- `xray2`: the other HDMI port
+
+See [docs/WIRING_DIAGRAM.md](docs/WIRING_DIAGRAM.md) for the full wiring notes
+and diagrams.
+
 ## Installer script
 
 For repeatable setup on another Pi, use:
@@ -19,7 +44,8 @@ This script:
 - creates `.venv`
 - installs `requirements.txt`
 - creates `.env` if one does not exist
-- patches and installs `medical-diorama.service` for the current Linux user
+- patches and installs `medical-diorama.service` for the current Linux user,
+  install directory, and user runtime directory
 - enables and starts the service
 - appends Wayfire rotation entries if they are not already present
 
@@ -98,6 +124,10 @@ sudo journalctl -u medical-diorama.service -f
 ```
 
 If the service is not installed yet, see `systemd startup` below.
+
+The systemd unit waits up to 60 seconds for the Pi user's Wayland socket before
+starting the app. This keeps the pygame X-ray display processes from starting
+before the desktop session is ready during boot.
 
 ## Connecting to the system
 
@@ -247,9 +277,11 @@ in the unit before installing it:
 - `User`
 - `Group`
 - `WorkingDirectory`
+- `XDG_RUNTIME_DIR`
 - `EnvironmentFile`
 - `ExecStart`
 
-If the X-ray windows need the desktop session's Wayland or X11 environment,
-uncomment the example `Environment=` lines in the unit and adjust them for
-the Pi user session.
+For most Raspberry Pi OS Bookworm / Wayfire installs, leave `WAYLAND_DISPLAY`
+unset so the app can discover the active `wayland-*` socket under
+`XDG_RUNTIME_DIR`. Set it manually only if the app selects the wrong desktop
+session.
